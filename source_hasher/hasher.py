@@ -1,7 +1,7 @@
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes       #for signing
 from cryptography.hazmat.primitives.asymmetric import padding, ec, rsa, utils   #for signing
-from .serialization import serialize_field_value
+from serialization import serialize_field_value
 
 # Utility class for hashing and signing, with or without HSM support
 class Hasher:

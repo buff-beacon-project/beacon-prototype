@@ -1,5 +1,5 @@
 import unittest
-from source_hasher.pulse import get_pulse_uri
+from pulse import get_pulse_uri
 
 class TestPulse(unittest.TestCase):
 

@@ -1,12 +1,8 @@
-from .status_codes import STATUS_CODES
 import datetime
-
-BEACON_VERSION='1.0'
-CYPHER_SUITE='0: SHA512 hashing and RSA signatures with PKCSv1.5 padding'
-PERIOD=datetime.timedelta(seconds=1)
+from status_codes import STATUS_CODES
+from config import BEACON_VERSION, CYPHER_SUITE, PERIOD
 
 def get_pulse_uri(chain_index, pulse_index):
-    global BEACON_VERSION
     return "https://{domain}{path}/{version}/chain/{chain_index}/pulse/{pulse_index}".format(
         domain='beacon-prototype.nist.gov',
         path='/api',
@@ -16,10 +12,6 @@ def get_pulse_uri(chain_index, pulse_index):
     )
 
 def init_pulse(hasher, chain_index, previous_pulse, hour_value, day_value, month_value, year_value):
-    global BEACON_VERSION
-    global CYPHER_SUITE
-    global PERIOD
-
     # meta information
     pulse_index = 1
     last_time = datetime.date.today()

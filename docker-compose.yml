@@ -4,7 +4,10 @@ services:
     source-hasher:
         build: "./source_hasher"
         image: "source-hasher"
+        environment:
+          ZMQ_BROADCAST_PORT: 5050
+          USE_HSM: 0
         ports:
-            - "8080:80"
+            - "5050:5050"
         command: ["python3", "app.py"]
         # restart: "always"

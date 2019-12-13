@@ -1,5 +1,5 @@
 import unittest
-from source_hasher.hasher import Hasher
+from hasher import Hasher
 from sys import getsizeof
 
 class TestHasher(unittest.TestCase):
