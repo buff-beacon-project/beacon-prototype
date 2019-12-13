@@ -2,7 +2,7 @@ version: '3.7'
 services:
     # Starts the curator to hash random numbers
     source-hasher:
-        build: "./source-hasher"
+        build: "./source_hasher"
         image: "source-hasher"
         ports:
             - "8080:80"

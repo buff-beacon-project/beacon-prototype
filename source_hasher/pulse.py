@@ -1,4 +1,4 @@
-import STATUS_CODES from status_codes
+from .status_codes import STATUS_CODES
 import datetime
 
 BEACON_VERSION='1.0'
@@ -7,9 +7,9 @@ PERIOD=datetime.timedelta(seconds=1)
 
 def get_pulse_uri(chain_index, pulse_index):
     global BEACON_VERSION
-    return "https://{domain}/{path}/{version}/{chain_index}/{pulse_index}".format(
+    return "https://{domain}{path}/{version}/chain/{chain_index}/pulse/{pulse_index}".format(
         domain='beacon-prototype.nist.gov',
-        path='api',
+        path='/api',
         version=BEACON_VERSION,
         chain_index=chain_index,
         pulse_index=pulse_index
@@ -21,12 +21,18 @@ def init_pulse(hasher, chain_index, previous_pulse, hour_value, day_value, month
     global PERIOD
 
     # meta information
-    pulse_index = pulse_index == None ? 1 : previous_pulse.pulseIndex + 1
+    pulse_index = 1
+    last_time = datetime.date.today()
+    status_code = STATUS_CODES.FIRST_PULSE
+
+    if pulse_index != None:
+        pulse_index = previous_pulse.pulseIndex + 1
+        last_time = datetime.utcfromtimestamp(previous_pulse.timeStamp)
+        status_code = STATUS_CODES.OK
+
     uri = get_pulse_uri(chain_index, pulse_index)
     period_ms = PERIOD.total_seconds() * 1000 # period in ms
-    last_time = previous_pulse == None ? datetime.date.today() : datetime.utcfromtimestamp(previous_pulse.timeStamp)
     time_stamp = (last_time + period_ms).isoformat()
-    status_code = is_first ? STATUS_CODES.FIRST_PULSE : STATUS_CODES.OK
 
     # random values
     local_random_value = hasher.get_local_random_value()
