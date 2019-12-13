@@ -1,6 +1,6 @@
 version: '3.7'
 services:
-    # Starts an NGINX server that serves front-end components
+    # Starts the curator to hash random numbers
     source-hasher:
         build: "./source-hasher"
         image: "source-hasher"
