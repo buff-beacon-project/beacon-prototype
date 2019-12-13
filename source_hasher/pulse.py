@@ -60,6 +60,8 @@ def init_pulse(hasher, chain_index, previous_pulse, hour_value, day_value, month
         ('outputValue', None)
     ])
 
+    return pulse
+
 def get_pulse_hash(hasher, pulse, until_field = None):
     pulse_values = []
     for key, value in pulse.items():
@@ -74,3 +76,4 @@ def finalize_pulse(hasher, pulse, next_pulse):
     sig_hash = get_pulse_hash(hasher, pulse, 'signatureValue')
     pulse.signatureValue = hasher.sign_hash(sig_hash)
     pulse.outputValue = get_pulse_hash(hasher, pulse, 'outputValue')
+    return pulse

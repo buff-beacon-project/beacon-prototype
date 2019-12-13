@@ -1,7 +1,7 @@
-from serialization import serialize_field_value
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes       #for signing
 from cryptography.hazmat.primitives.asymmetric import padding, ec, rsa, utils   #for signing
+from .serialization import serialize_field_value
 
 # Utility class for hashing and signing, with or without HSM support
 class Hasher:
@@ -26,7 +26,7 @@ class Hasher:
         return self.public_key_id
 
     def store_public_key(self):
-        self.public_key = self.use_hsm ? self.hsm_asym_key.get_public_key() : self.private_key.public_key()
+        self.public_key = self.hsm_asym_key.get_public_key() if self.use_hsm else self.private_key.public_key()
         self.public_key_id = self.hash(self.public_key)
         # TODO: send message to store public key using public key hash
 
