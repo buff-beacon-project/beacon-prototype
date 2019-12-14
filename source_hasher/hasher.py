@@ -1,6 +1,13 @@
+from random import randrange
+
+from yubihsm import YubiHsm
+from yubihsm.defs import CAPABILITY, ALGORITHM
+from yubihsm.objects import AsymmetricKey
+
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes       #for signing
 from cryptography.hazmat.primitives.asymmetric import padding, ec, rsa, utils   #for signing
+
 from serialization import serialize_field_value
 
 # Utility class for hashing and signing, with or without HSM support
@@ -23,7 +30,7 @@ class Hasher:
         return self.public_key
 
     def get_public_key_id(self):
-        return self.public_key_id
+        return self.public_key_id.hex()
 
     def store_public_key(self):
         self.public_key = self.hsm_asym_key.get_public_key() if self.use_hsm else self.private_key.public_key()
@@ -70,9 +77,9 @@ class Hasher:
     # NOT WITH HSM...
     def sign_hash_no_hsm(self, hash_digest):
         # Line 579-583  The hashing is not repeated inside the illustrated Signing module
-        return private_key.sign(
+        return self.private_key.sign(
             hash_digest,
-            padding.PKCS1v15,
+            padding.PKCS1v15(),
             utils.Prehashed(self.signing_hash_strategy)
         )
 
