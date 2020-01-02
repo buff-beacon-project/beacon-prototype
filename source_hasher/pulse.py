@@ -1,7 +1,10 @@
 from datetime import datetime
+from time import time
 from collections import OrderedDict
 import status_codes
 from config import BEACON_VERSION, CYPHER_SUITE, PERIOD
+
+EMPTY_HASH = '0'*128
 
 def get_pulse_uri(chain_index, pulse_index):
     return "https://{domain}{path}/{version}/chain/{chain_index}/pulse/{pulse_index}".format(
@@ -30,8 +33,6 @@ def init_pulse(hasher, chain_index, previous_pulse, hour_value, day_value, month
     # random values
     local_random_value = hasher.get_local_random_value()
 
-    previous_value = previous_pulse['outputValue'] if previous_pulse != None else None
-
     pulse = OrderedDict([
         ('uri', uri),
         ('version', BEACON_VERSION),
@@ -44,7 +45,7 @@ def init_pulse(hasher, chain_index, previous_pulse, hour_value, day_value, month
         ('localRandomValue', local_random_value.hex()),
         # TODO external sources
         # ...
-        ('previous', previous_value),
+        ('previous', None),
         ('hour', hour_value),
         ('day', day_value),
         ('month', month_value),
@@ -65,7 +66,9 @@ def get_pulse_hash(hasher, pulse, until_field = None):
         pulse_values.append(value)
     return hasher.hash_many(pulse_values)
 
-def finalize_pulse(hasher, pulse, next_pulse):
+def finalize_pulse(hasher, pulse, previous_pulse, next_pulse):
+    global EMPTY_HASH
+    pulse['previous'] = previous_pulse['outputValue'] if previous_pulse != None else EMPTY_HASH
     pulse['precommitmentValue'] = hasher.hash(next_pulse['localRandomValue']).hex()
     # sign the hash of all
     sig_hash = get_pulse_hash(hasher, pulse, 'signatureValue')

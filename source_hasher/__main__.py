@@ -6,40 +6,36 @@ import pulse
 import hasher
 from threading import Timer
 from config import MAX_TIMEDELTA
+from exceptions import LatePulseException, PulseTimeException
 
-class BeaconException(Exception):
-    pass
-
-class LatePulseException(BeaconException):
-    pass
-
-def get_zmq_pub_socket(port):
+def get_zmq_socket(port):
     context = zmq.Context()
-    socket = context.socket(zmq.PUB)
-    socket.bind("tcp://*:%s" % port)
+    socket = context.socket(zmq.REQ)
+    socket.connect("tcp://beacon-storage:%s" % port)
     return socket
+
+def prepare_pulse_for_send(pulse):
+    p = pulse.copy()
+    p['timeStamp'] = p['timeStamp'].timestamp()
+    return p
 
 class Controller:
     def __init__(self):
         pub_port = os.getenv('ZMQ_BROADCAST_PORT', 5050)
         use_hsm = os.getenv('USE_HSM', 0) == 1
 
-        self.socket = get_zmq_pub_socket(pub_port)
+        self.socket = get_zmq_socket(pub_port)
         self.hasher = hasher.Hasher(use_hsm)
 
-    """
-    note: https://github.com/zeromq/pyzmq/issues/957
-    subscriber needs:
-        socket.setsockopt_string(zmq.SUBSCRIBE, topic)
-    The subscriber will have to eat the topic with an extra receive:
-        topic = socket.recv_string()
-        data = socket.recv_json()
-    """
     def send(self, data):
-        topic = "pulse"
         socket = self.socket
-        socket.send_string(topic, zmq.SNDMORE)
         socket.send_json(data)
+        response = socket.recv_json()
+        if 'ok' in response and response['ok']:
+            return True
+        if 'error' in response:
+            print(response['error'])
+            raise Exception(response['error']['message'])
 
     def prepare_next_pulse(self):
         chain_index = 1
@@ -61,11 +57,20 @@ class Controller:
         )
 
     def emit_pulse(self):
+        delta = (self.current_pulse['timeStamp'] - datetime.today()).total_seconds()
+        if delta > 0:
+            # We need to do this because the Timer object from multi-threading
+            # is not exact. It sometimes releases it a bit before the time specified
+            time.sleep(delta)
+
+        # TODO: check if i really need this...
+        if delta < 0 and abs(delta) > MAX_TIMEDELTA.total_seconds():
+            raise LatePulseException
+
         self.prepare_next_pulse()
-        pulse.finalize_pulse(self.hasher, self.current_pulse, self.next_pulse)
-        print('pulse')
-        print(self.current_pulse, flush=True)
-        # self.send(self.current_pulse)
+        pulse.finalize_pulse(self.hasher, self.current_pulse, self.previous_pulse, self.next_pulse)
+        self.send(prepare_pulse_for_send(self.current_pulse))
+        self.previous_pulse = self.current_pulse
         self.current_pulse = self.next_pulse
         self.next_pulse = None
 
@@ -91,6 +96,7 @@ class Controller:
 
     def start(self):
         chain_index = 1
+        self.previous_pulse = None
         self.current_pulse = None
         self.prepare_next_pulse()
         self.current_pulse = self.next_pulse
