@@ -5,7 +5,7 @@ services:
         image: "source-hasher"
         build:
             context: "./source_hasher"
-            dockerfile: Dockerfile
+            dockerfile: "../Dockerfile"
         volumes:
             # for development
             - ./source_hasher/:/usr/src/app
@@ -24,7 +24,7 @@ services:
         image: "beacon-storage"
         build:
             context: "./beacon_storage"
-            dockerfile: Dockerfile
+            dockerfile: "../Dockerfile"
         volumes:
             # for development
             - ./beacon_storage/:/usr/src/app
