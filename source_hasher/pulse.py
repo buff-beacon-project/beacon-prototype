@@ -70,11 +70,11 @@ def get_pulse_hash(hasher, pulse, until_field = None):
 def finalize_pulse(hasher, pulse, previous_pulse, next_pulse):
     global EMPTY_HASH
     pulse['previous'] = previous_pulse['outputValue'] if previous_pulse != None else EMPTY_HASH
-    pulse['precommitmentValue'] = hasher.hash(next_pulse['localRandomValue']).hex()
+    pulse['precommitmentValue'] = hasher.hash(next_pulse['localRandomValue'])
     # sign the hash of all
     sig_hash = get_pulse_hash(hasher, pulse, 'signatureValue')
-    pulse['signatureValue'] = hasher.sign_hash(sig_hash).hex()
-    pulse['outputValue'] = get_pulse_hash(hasher, pulse, 'outputValue').hex()
+    pulse['signatureValue'] = hasher.sign_hash(sig_hash)
+    pulse['outputValue'] = get_pulse_hash(hasher, pulse, 'outputValue')
     return pulse
 
 class PulseJSONEncoder(json.JSONEncoder):
