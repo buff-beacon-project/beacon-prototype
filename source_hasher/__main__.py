@@ -14,11 +14,6 @@ def get_zmq_socket(port):
     socket.connect("tcp://beacon-storage:%s" % port)
     return socket
 
-def prepare_pulse_for_send(pulse):
-    p = pulse.copy()
-    p['timeStamp'] = p['timeStamp'].timestamp()
-    return p
-
 class Controller:
     def __init__(self):
         pub_port = os.getenv('ZMQ_BROADCAST_PORT', 5050)
@@ -27,9 +22,13 @@ class Controller:
         self.socket = get_zmq_socket(pub_port)
         self.hasher = hasher.Hasher(use_hsm)
 
-    def send(self, data):
+    def send(self, data, as_string=False):
         socket = self.socket
-        socket.send_json(data)
+        if as_string:
+            socket.send_string(data)
+        else:
+            socket.send_json(data)
+
         response = socket.recv_json()
         if 'ok' in response and response['ok']:
             return True
@@ -40,7 +39,7 @@ class Controller:
     def prepare_next_pulse(self):
         chain_index = 1
 
-        TEST_HASH = self.hasher.hash(1).hex()
+        TEST_HASH = self.hasher.hash(1)
         hour_value = TEST_HASH
         day_value = TEST_HASH
         month_value = TEST_HASH
@@ -69,7 +68,7 @@ class Controller:
 
         self.prepare_next_pulse()
         pulse.finalize_pulse(self.hasher, self.current_pulse, self.previous_pulse, self.next_pulse)
-        self.send(prepare_pulse_for_send(self.current_pulse))
+        self.send(pulse.pulse_to_json(self.current_pulse), True)
         self.previous_pulse = self.current_pulse
         self.current_pulse = self.next_pulse
         self.next_pulse = None

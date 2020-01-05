@@ -1,4 +1,6 @@
-from datetime import datetime
+import json
+import numpy as np
+from datetime import datetime, timedelta
 from time import time
 from collections import OrderedDict
 import status_codes
@@ -27,7 +29,6 @@ def init_pulse(hasher, chain_index, previous_pulse, hour_value, day_value, month
         status_code = status_codes.OK
 
     uri = get_pulse_uri(chain_index, pulse_index)
-    period_ms = PERIOD.total_seconds() * 1000 # period in ms
     time_stamp = last_time + PERIOD
 
     # random values
@@ -36,13 +37,13 @@ def init_pulse(hasher, chain_index, previous_pulse, hour_value, day_value, month
     pulse = OrderedDict([
         ('uri', uri),
         ('version', BEACON_VERSION),
-        ('cypherSuite', CYPHER_SUITE),
-        ('period', period_ms),
+        ('cypherSuite', np.uint32(CYPHER_SUITE)),
+        ('period', PERIOD),
         ('certificateId', hasher.get_public_key_id()),
         ('chainIndex', chain_index),
         ('pulseIndex', pulse_index),
         ('timeStamp', time_stamp),
-        ('localRandomValue', local_random_value.hex()),
+        ('localRandomValue', local_random_value),
         # TODO external sources
         # ...
         ('previous', None),
@@ -51,7 +52,7 @@ def init_pulse(hasher, chain_index, previous_pulse, hour_value, day_value, month
         ('month', month_value),
         ('year', year_value),
         ('precommitmentValue', None),
-        ('statusCode', status_code),
+        ('statusCode', np.uint32(status_code)),
         ('signatureValue', None),
         ('outputValue', None)
     ])
@@ -75,3 +76,28 @@ def finalize_pulse(hasher, pulse, previous_pulse, next_pulse):
     pulse['signatureValue'] = hasher.sign_hash(sig_hash).hex()
     pulse['outputValue'] = get_pulse_hash(hasher, pulse, 'outputValue').hex()
     return pulse
+
+class PulseJSONEncoder(json.JSONEncoder):
+    def default(self, value):
+        # dateStr
+        if isinstance(value, datetime):
+            return value.timestamp()
+        # uint64
+        if isinstance(value, np.uint64):
+            return int(value)
+        # uint32
+        if isinstance(value, np.uint32):
+            return int(value)
+        # duration... for period
+        if isinstance(value, timedelta):
+            return int(value.total_seconds() * 1000)
+
+        t = type(value)
+        # for hashes
+        if t is bytes:
+            return value.hex()
+
+        return json.JSONEncoder.default(self, value)
+
+def pulse_to_json(pulse, **kwargs):
+    return json.dumps(pulse, cls=PulseJSONEncoder, **kwargs)

@@ -10,6 +10,7 @@ pyzmq = "*"
 yubihsm = "*"
 cryptography = "*"
 requests = "*"
+numpy = "*"
 
 [requires]
 python_version = "3.7"

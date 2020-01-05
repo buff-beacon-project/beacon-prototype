@@ -1,6 +1,7 @@
 import os
 import sys, traceback
 import sqlite3
+import json
 from collections import OrderedDict
 from datetime import datetime
 import zmq
@@ -202,7 +203,7 @@ if __name__ == '__main__':
         try:
             pulse = socket.recv_json()
             print("received pulse {pulseIndex}, chain {chainIndex}".format(**pulse))
-            # print(pulse)
+            print(json.dumps(pulse, sort_keys=True, indent=4))
             store.add_pulse(pulse)
             print("stored successfully")
             socket.send(b'{"ok":true}')

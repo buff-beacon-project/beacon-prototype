@@ -1,4 +1,4 @@
-from random import randrange
+from random import getrandbits
 
 from yubihsm import YubiHsm
 from yubihsm.defs import CAPABILITY, ALGORITHM
@@ -6,6 +6,7 @@ from yubihsm.objects import AsymmetricKey
 
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes       #for signing
+from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 from cryptography.hazmat.primitives.asymmetric import padding, ec, rsa, utils   #for signing
 
 from serialization import serialize_field_value
@@ -29,12 +30,15 @@ class Hasher:
     def get_public_key(self):
         return self.public_key
 
+    def get_public_key_bytes(self):
+        return self.public_key.public_bytes(Encoding.PEM, PublicFormat.PKCS1)
+
     def get_public_key_id(self):
-        return self.public_key_id.hex()
+        return self.public_key_id
 
     def store_public_key(self):
         self.public_key = self.hsm_asym_key.get_public_key() if self.use_hsm else self.private_key.public_key()
-        self.public_key_id = self.hash(self.public_key)
+        self.public_key_id = self.hash(self.get_public_key_bytes())
         # TODO: send message to store public key using public key hash
 
     # TODO: make this better
@@ -53,8 +57,8 @@ class Hasher:
 
     def get_local_random_value(self):
         values = []
-        values.append( randrange(0, 2 ** 512) )
-        values.append( randrange(0, 2 ** 512) )
+        values.append( getrandbits(512).to_bytes(512, byteorder='big', signed=False) )
+        values.append( getrandbits(512).to_bytes(512, byteorder='big', signed=False) )
         return self.hash_many(values)
 
     def hash_many(self, fields):
