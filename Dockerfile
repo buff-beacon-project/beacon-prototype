@@ -1,4 +1,4 @@
-FROM python:alpine
+FROM python:3-alpine
 
 RUN apk update \
   && apk add --no-cache \
@@ -10,7 +10,6 @@ RUN apk update \
     # python3 \
     python3-dev \
     zeromq-dev \
-    py3-zmq \
   && pip3 install pipenv --no-cache-dir \
   && rm -rf /var/cache/apk/*
 
