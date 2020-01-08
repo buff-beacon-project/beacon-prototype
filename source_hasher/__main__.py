@@ -17,7 +17,7 @@ def get_zmq_socket(port):
 class Controller:
     def __init__(self):
         pub_port = os.getenv('ZMQ_BROADCAST_PORT', 5050)
-        use_hsm = os.getenv('USE_HSM', 0) == 1
+        use_hsm = int(os.getenv('USE_HSM', 0)) == 1
 
         self.socket = get_zmq_socket(pub_port)
         self.hasher = hasher.Hasher(use_hsm)
