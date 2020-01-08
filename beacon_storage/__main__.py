@@ -5,6 +5,8 @@ import json
 from collections import OrderedDict
 from datetime import datetime
 import zmq
+# from beacon_shared import Test
+# Test()
 # from sqlite3 import Error
 DB_SQL_FILE='beacon.db'
 DB_TABLE='beacon_records'

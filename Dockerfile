@@ -1,23 +1,8 @@
-FROM python:3-alpine
+FROM base
 
-RUN apk update \
-  && apk add --no-cache \
-    build-base \
-    libzmq \
-    libressl-dev \
-    musl-dev \
-    libffi-dev \
-    # python3 \
-    python3-dev \
-    zeromq-dev \
-  && pip3 install pipenv --no-cache-dir \
-  && rm -rf /var/cache/apk/*
+WORKDIR /app
 
-# Create app directory
-# RUN mkdir /usr/src/app
-WORKDIR /usr/src/app
-
-# Bundle app source
+# copy app files
 COPY . .
 
 RUN pipenv install --system --deploy --ignore-pipfile --sequential

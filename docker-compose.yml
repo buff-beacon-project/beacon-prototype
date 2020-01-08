@@ -1,5 +1,8 @@
 version: '3'
 services:
+    base:
+        image: "base"
+        build: "./beacon_shared"
     # Starts the curator to hash random numbers
     source-hasher:
         image: "source-hasher"
@@ -8,13 +11,16 @@ services:
             dockerfile: "../Dockerfile"
         volumes:
             # for development
-            - ./source_hasher/:/usr/src/app
+            - ./source_hasher/:/app
+            - ./beacon_shared:/beacon_shared
         environment:
             ZMQ_BROADCAST_PORT: 5050
             USE_HSM: 0
         # ports:
         #     - "5050:5050"
-        command: ["python3", "."]
+        command: ["python3", "/app"]
+        depends_on:
+            - "beacon-storage"
         # command: ["sh"]
         # entrypoint: /bin/sh
         # stdin_open: true
@@ -27,10 +33,11 @@ services:
             dockerfile: "../Dockerfile"
         volumes:
             # for development
-            - ./beacon_storage/:/usr/src/app
+            - ./beacon_storage/:/app
+            - ./beacon_shared:/beacon_shared
         environment:
             ZMQ_LISTEN_PORT: 5050
         # ports:
         #     - "5050:5050"
         tty: true
-        command: ["python3", "."]
+        command: ["python3", "/app"]
