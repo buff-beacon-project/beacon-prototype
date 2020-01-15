@@ -45,3 +45,14 @@ $ docker-compose up
 # Tests
 
 $ pipenv run python3 -m unittest discover
+
+# TODO
+
+[ ] check docker permissions and get rid of privileged: true
+[ ] use https for communication with HSM??
+
+# References for development
+
+* https://developers.yubico.com/python-yubihsm
+* https://github.com/coreos/fero
+* http://gw.tnode.com/docker/docker-machine-with-usb-support-on-windows-macos/
