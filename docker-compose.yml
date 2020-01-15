@@ -3,6 +3,16 @@ services:
     base:
         image: "base"
         build: "./beacon_shared"
+
+    yubihsm:
+        image: "yubihsm"
+        build:
+            context: "./source_hasher"
+            dockerfile: "./Dockerfile.yubihsm"
+        privileged: true
+        devices:
+            - "/dev:/dev"
+
     # Starts the curator to hash random numbers
     source-hasher:
         image: "source-hasher"
@@ -15,17 +25,19 @@ services:
             - ./beacon_shared:/beacon_shared
         environment:
             ZMQ_BROADCAST_PORT: 5050
-            USE_HSM: 0
+            USE_HSM: 1
         # ports:
         #     - "5050:5050"
         command: ["python3", "/app"]
         depends_on:
+            - "yubihsm"
             - "beacon-storage"
         # command: ["sh"]
         # entrypoint: /bin/sh
         # stdin_open: true
         # tty: true
         # restart: "always"
+
     beacon-storage:
         image: "beacon-storage"
         build:

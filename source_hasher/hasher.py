@@ -48,7 +48,7 @@ class Hasher:
         hsm_port = 12345
         # Return a YubiHsm connected to the backend specified by the URL
         # In this case, the HSM is connected to a connector running on localhost.
-        hsm = YubiHsm.connect("http://localhost:%s" % hsm_port)
+        hsm = YubiHsm.connect("http://yubihsm:%s" % hsm_port)
         # Create an authenticated session with the HSM
         self.hsm_session = hsm.create_session_derived(1, 'password')
 
@@ -75,7 +75,7 @@ class Hasher:
     def sign_hash_hsm(self, hash_digest):
         return self.hsm_asym_key.sign_pkcs1v1_5(
             hash_digest,
-            utils.Prehashed(self.signing_hash_strategy)
+            hashes.SHA512()
         )
 
     # NOT WITH HSM...
