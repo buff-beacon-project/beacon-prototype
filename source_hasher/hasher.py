@@ -9,7 +9,7 @@ from cryptography.hazmat.primitives import hashes       #for signing
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 from cryptography.hazmat.primitives.asymmetric import padding, ec, rsa, utils   #for signing
 
-from serialization import serialize_field_value
+from serialization import serialize_field_value, concat_serialize
 
 # Utility class for hashing and signing, with or without HSM support
 class Hasher:
@@ -72,23 +72,28 @@ class Hasher:
         hasher.update(serialize_field_value(value))
         return hasher.finalize()
 
-    def sign_hash_hsm(self, hash_digest):
+    def sign_values_hsm(self, values):
+        # Line 579-583  The hashing is not repeated inside the illustrated Signing module
+        #
+        # however, the python yubihsm hashes locally, before sending the
+        # value to the HSM, so this is fine... and why we pass unhashed bytes
+        data = concat_serialize(values)
         return self.hsm_asym_key.sign_pkcs1v1_5(
-            hash_digest,
-            hashes.SHA512()
+            data,
+            self.signing_hash_strategy
         )
 
     # NOT WITH HSM...
-    def sign_hash_no_hsm(self, hash_digest):
-        # Line 579-583  The hashing is not repeated inside the illustrated Signing module
+    def sign_values_no_hsm(self, values):
+        data = concat_serialize(values)
         return self.private_key.sign(
-            hash_digest,
+            data,
             padding.PKCS1v15(),
-            utils.Prehashed(self.signing_hash_strategy)
+            self.signing_hash_strategy
         )
 
-    def sign_hash(self, hash_digest):
+    def sign_values(self, values):
         if self.use_hsm:
-            return self.sign_hash_hsm(hash_digest)
+            return self.sign_values_hsm(values)
         else:
-            return self.sign_hash_no_hsm(hash_digest)
+            return self.sign_values_no_hsm(values)

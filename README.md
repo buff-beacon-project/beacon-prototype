@@ -53,6 +53,7 @@ $ pipenv run python3 -m unittest discover
 
 # References for development
 
+* https://nvlpubs.nist.gov/nistpubs/ir/2019/NIST.IR.8213-draft.pdf
 * https://developers.yubico.com/python-yubihsm
 * https://github.com/coreos/fero
 * http://gw.tnode.com/docker/docker-machine-with-usb-support-on-windows-macos/

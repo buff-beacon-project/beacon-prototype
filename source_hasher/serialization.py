@@ -48,3 +48,8 @@ def serialize_field_value(value):
         return encode_bytes(value)
 
     raise TypeError('Serialize is not implemented for type {}'.format(t))
+
+# serialize the values and then concatenate them
+def concat_serialize(values):
+    serialized = map(serialize_field_value, values)
+    return b"".join(serialized)

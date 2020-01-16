@@ -59,21 +59,25 @@ def init_pulse(hasher, chain_index, previous_pulse, hour_value, day_value, month
 
     return pulse
 
-def get_pulse_hash(hasher, pulse, until_field = None):
+# get values from the pulse, in order, up until specified field
+def get_pulse_values(pulse, until_field = None):
     pulse_values = []
     for key, value in pulse.items():
         if key == until_field:
             break
         pulse_values.append(value)
-    return hasher.hash_many(pulse_values)
+    return pulse_values
+
+def get_pulse_hash(hasher, pulse, until_field = None):
+    return hasher.hash_many(get_pulse_values(pulse, until_field))
 
 def finalize_pulse(hasher, pulse, previous_pulse, next_pulse):
     global EMPTY_HASH
     pulse['previous'] = previous_pulse['outputValue'] if previous_pulse != None else EMPTY_HASH
     pulse['precommitmentValue'] = hasher.hash(next_pulse['localRandomValue'])
     # sign the hash of all
-    sig_hash = get_pulse_hash(hasher, pulse, 'signatureValue')
-    pulse['signatureValue'] = hasher.sign_hash(sig_hash)
+    values_to_sign = get_pulse_values(pulse, 'signatureValue')
+    pulse['signatureValue'] = hasher.sign_values(values_to_sign)
     pulse['outputValue'] = get_pulse_hash(hasher, pulse, 'outputValue')
     return pulse
 
