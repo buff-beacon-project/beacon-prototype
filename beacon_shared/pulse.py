@@ -106,6 +106,10 @@ def finalize_pulse(hasher, pulse, previous_pulse, next_pulse):
     pulse['outputValue'] = ByteHash(get_pulse_hash(hasher, pulse, 'outputValue'))
     return pulse
 
+# helpful for preparing a pulse for transit, or encoding to json
+def pulse_to_plain_dict(pulse):
+    return { key: value.get_json_value() for key, value in pulse.items() }
+
 class PulseJSONEncoder(json.JSONEncoder):
     def default(self, value):
         if isinstance(value, BeaconType):

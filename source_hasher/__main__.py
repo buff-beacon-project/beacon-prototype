@@ -69,7 +69,10 @@ class Controller:
 
         self.prepare_next_pulse()
         pulse.finalize_pulse(self.hasher, self.current_pulse, self.previous_pulse, self.next_pulse)
-        self.send(pulse.pulse_to_json(self.current_pulse), True)
+        self.send({
+            'command': 'add_pulse',
+            'data': pulse.pulse_to_plain_dict(self.current_pulse)
+        })
         self.previous_pulse = self.current_pulse
         self.current_pulse = self.next_pulse
         self.next_pulse = None

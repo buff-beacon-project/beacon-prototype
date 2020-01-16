@@ -83,7 +83,7 @@ class BeaconStorage:
                     certificateId text NOT NULL,
                     chainIndex integer NOT NULL,
                     pulseIndex integer NOT NULL,
-                    timeStamp real NOT NULL,
+                    timeStamp text NOT NULL,
                     localRandomValue text NOT NULL,
 
                     previous text NOT NULL,
@@ -161,23 +161,57 @@ def get_zmq_socket(port):
     socket.bind("tcp://*:%s" % port)
     return socket
 
+
+class ZMQServer:
+    def __init__(self, handlers):
+        self.handlers = handlers
+        self.socket = None
+
+    def start(self, port):
+        if self.socket:
+            raise Exception('ZMQ server already started')
+
+        self.socket = get_zmq_socket(port)
+        # zmq requests come in as { command: '<string>', data: {} }
+        while True:
+            try:
+                request = self.socket.recv_json()
+                response = self.handle_request(request)
+                self.socket.send_json(response)
+            except Exception as e:
+                print(e)
+                traceback.print_exc(file=sys.stdout)
+                self.socket.send_json({ "error": { "message": str(e) } })
+
+    def handle_request(self, req):
+        if not 'command' in req:
+            raise Exception('Request malformed. Lacking a "command" property.')
+
+        command = req['command']
+        if not command in self.handlers:
+            raise Exception('Ho handler defined for command "{}"'.format(command))
+
+        handler = self.handlers[command]
+        response = handler(req['data'])
+        if not response:
+            return { "ok": True }
+        else:
+            return { "ok": True, "data": response }
+
+
 if __name__ == '__main__':
     store = BeaconStorage()
 
+    def add_pulse(data):
+        print("received pulse {pulseIndex}, chain {chainIndex}".format(**data))
+        print(json.dumps(data, sort_keys=True, indent=4))
+        store.add_pulse(pulse_from_dict(data))
+
+    server = ZMQServer({
+        # commands the server is listening to.
+        'add_pulse': add_pulse,
+    })
+
     pub_port = os.getenv('ZMQ_LISTEN_PORT', 5050)
-    socket = get_zmq_socket(pub_port)
-
-    while True:
-        try:
-            dict = socket.recv_json()
-            print("received pulse {pulseIndex}, chain {chainIndex}".format(**dict))
-            print(json.dumps(dict, sort_keys=True, indent=4))
-
-            pulse = pulse_from_dict(dict)
-            store.add_pulse(pulse)
-            print("stored successfully")
-            socket.send(b'{"ok":true}')
-        except Exception as e:
-            print(e)
-            traceback.print_exc(file=sys.stdout)
-            socket.send_json({ "error": { "message": str(e) } })
+    # listens...
+    server.start(pub_port)
