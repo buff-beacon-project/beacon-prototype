@@ -22,7 +22,7 @@ class BeaconType(ABC):
     Default get method
     """
     def get(self):
-        return value
+        return self.value
 
     """
     Get a json-ready value for conversion.

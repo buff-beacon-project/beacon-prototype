@@ -2,7 +2,7 @@ import json
 from datetime import datetime, timedelta
 from time import time
 from collections import OrderedDict
-import status_codes
+from .status_codes import *
 from .types import *
 from .config import BEACON_VERSION, CYPHER_SUITE, PERIOD
 
@@ -46,12 +46,12 @@ def init_pulse(hasher, chain_index, previous_pulse, hour_value, day_value, month
     # meta information
     pulse_index = 1
     last_time = datetime.today() - PERIOD
-    status_code = status_codes.FIRST_PULSE
+    status_code = STATUS_FIRST_PULSE
 
     if previous_pulse != None:
         pulse_index = previous_pulse['pulseIndex'].get() + 1
         last_time = previous_pulse['timeStamp'].get()
-        status_code = status_codes.OK
+        status_code = STATUS_OK
 
     uri = get_pulse_uri(chain_index, pulse_index)
     time_stamp = last_time + PERIOD
@@ -98,12 +98,12 @@ def get_pulse_hash(hasher, pulse, until_field = None):
 
 def finalize_pulse(hasher, pulse, previous_pulse, next_pulse):
     global EMPTY_HASH
-    pulse['previous'] = previous_pulse['outputValue'] if previous_pulse != None else EMPTY_HASH
-    pulse['precommitmentValue'] = hasher.hash(next_pulse['localRandomValue'])
+    pulse['previous'] = previous_pulse['outputValue'] if previous_pulse != None else ByteHash(EMPTY_HASH)
+    pulse['precommitmentValue'] = ByteHash(hasher.hash(next_pulse['localRandomValue']))
     # sign the hash of all
     values_to_sign = get_pulse_values(pulse, 'signatureValue')
-    pulse['signatureValue'] = hasher.sign_values(values_to_sign)
-    pulse['outputValue'] = get_pulse_hash(hasher, pulse, 'outputValue')
+    pulse['signatureValue'] = ByteHash(hasher.sign_values(values_to_sign))
+    pulse['outputValue'] = ByteHash(get_pulse_hash(hasher, pulse, 'outputValue'))
     return pulse
 
 class PulseJSONEncoder(json.JSONEncoder):

@@ -58,8 +58,8 @@ class Hasher:
 
     def get_local_random_value(self):
         values = []
-        values.append( getrandbits(512).to_bytes(512, byteorder='big', signed=False) )
-        values.append( getrandbits(512).to_bytes(512, byteorder='big', signed=False) )
+        values.append( ByteHash(getrandbits(512).to_bytes(512, byteorder='big', signed=False)) )
+        values.append( ByteHash(getrandbits(512).to_bytes(512, byteorder='big', signed=False)) )
         return self.hash_many(values)
 
     def hash_many(self, fields):

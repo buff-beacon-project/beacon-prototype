@@ -2,11 +2,12 @@ import os
 import time
 from datetime import datetime
 import zmq
-import .beacon_shared.pulse
 import hasher
 from threading import Timer
-from .beacon_shared.config import MAX_TIMEDELTA
+from beacon_shared.config import MAX_TIMEDELTA
 from exceptions import LatePulseException, PulseTimeException
+import beacon_shared.pulse as pulse
+from beacon_shared.types import UInt64
 
 def get_zmq_socket(port):
     context = zmq.Context()
@@ -39,7 +40,7 @@ class Controller:
     def prepare_next_pulse(self):
         chain_index = 1
 
-        TEST_HASH = self.hasher.hash(1)
+        TEST_HASH = self.hasher.hash(UInt64(1))
         hour_value = TEST_HASH
         day_value = TEST_HASH
         month_value = TEST_HASH
@@ -56,7 +57,7 @@ class Controller:
         )
 
     def emit_pulse(self):
-        delta = (self.current_pulse['timeStamp'] - datetime.today()).total_seconds()
+        delta = (self.current_pulse['timeStamp'].get() - datetime.today()).total_seconds()
         if delta > 0:
             # We need to do this because the Timer object from multi-threading
             # is not exact. It sometimes releases it a bit before the time specified
@@ -74,7 +75,7 @@ class Controller:
         self.next_pulse = None
 
     def wait_and_emit_next_pulse(self):
-        target = self.current_pulse['timeStamp']
+        target = self.current_pulse['timeStamp'].get()
         now = datetime.today()
         if now >= target:
             lateness = now - target

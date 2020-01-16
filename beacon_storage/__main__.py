@@ -5,100 +5,62 @@ import json
 from collections import OrderedDict
 from datetime import datetime
 import zmq
-# from beacon_shared import Test
-# Test()
-# from sqlite3 import Error
-DB_SQL_FILE='beacon.db'
-DB_TABLE='beacon_records'
+from beacon_shared.pulse import pulse_from_dict
+
+DB_SQL_FILE = 'beacon.db'
+DB_TABLE = 'beacon_records'
+
+PULSE_KEYS = [
+    'uri',
+    'version',
+    'cypherSuite',
+    'period',
+    'certificateId',
+    'chainIndex',
+    'pulseIndex',
+    'timeStamp',
+    'localRandomValue',
+    # TODO external sources
+    # ...
+    'previous',
+    'hour',
+    'day',
+    'month',
+    'year',
+    'precommitmentValue',
+    'statusCode',
+    'signatureValue',
+    'outputValue'
+]
 
 class PulseChainException(Exception):
     pass
 
 def assert_next_in_chain(lastPulse, currentPulse):
     # TODO make this check signatures
-    if lastPulse == None:
-        if currentPulse['chainIndex'] != 1 or currentPulse['pulseIndex'] != 1:
+    if lastPulse is None:
+        if currentPulse['chainIndex'].get() != 1 or currentPulse['pulseIndex'].get() != 1:
             raise PulseChainException('Expecting first pulse in first chain but received chain {}, pulse {}'.format(currentPulse['chainIndex'], currentPulse['pulseIndex']))
         return
-    if lastPulse['chainIndex'] != currentPulse['chainIndex']:
-        if currentPulse['pulseIndex'] != 1:
+    if lastPulse['chainIndex'].get() != currentPulse['chainIndex'].get():
+        if currentPulse['pulseIndex'].get() != 1:
             raise PulseChainException('Received pulse has new chain index but is not first pulse')
     else:
-        if currentPulse['pulseIndex'] != lastPulse['pulseIndex'] + 1:
+        if currentPulse['pulseIndex'].get() != lastPulse['pulseIndex'].get() + 1:
             raise PulseChainException('Received pulse is not next in chain')
 
-    if lastPulse['outputValue'] != currentPulse['previous']:
+    if lastPulse['outputValue'].get() != currentPulse['previous'].get():
         raise PulseChainException('Received pulse "previous" value does not match last pulse "outputValue"')
 
+# convert sql row to pulse
 def from_row(row):
-    # convert sql row to pulse
-    (
-        id,
-        uri,
-        version,
-        cypherSuite,
-        period,
-        certificateId,
-        chainIndex,
-        pulseIndex,
-        timeStamp,
-        localRandomValue,
-
-        previousValue,
-        hourValue,
-        dayValue,
-        monthValue,
-        yearValue,
-        precommitmentValue,
-        statusCode,
-        signatureValue,
-        outputValue
-    ) = row
-    return OrderedDict([
-        ('uri', uri),
-        ('version', version),
-        ('cypherSuite', cypherSuite),
-        ('period', period),
-        ('certificateId', certificateId),
-        ('chainIndex', chainIndex),
-        ('pulseIndex', pulseIndex),
-        ('timeStamp', timeStamp),
-        ('localRandomValue', localRandomValue),
-        # TODO external sources
-        # ...
-        ('previous', previousValue),
-        ('hour', hourValue),
-        ('day', dayValue),
-        ('month', monthValue),
-        ('year', yearValue),
-        ('precommitmentValue', precommitmentValue),
-        ('statusCode', statusCode),
-        ('signatureValue', signatureValue),
-        ('outputValue', outputValue)
-    ])
+    global PULSE_KEYS
+    return pulse_from_dict( dict( zip(PULSE_KEYS, row) ) )
 
 def to_row( pulse ):
-    return (
-        pulse['uri'],
-        pulse['version'],
-        pulse['cypherSuite'],
-        pulse['period'],
-        pulse['certificateId'],
-        pulse['chainIndex'],
-        pulse['pulseIndex'],
-        pulse['timeStamp'],
-        pulse['localRandomValue'],
-
-        pulse['previousValue'],
-        pulse['hour'],
-        pulse['day'],
-        pulse['month'],
-        pulse['year'],
-        pulse['precommitmentValue'],
-        pulse['statusCode'],
-        pulse['signatureValue'],
-        pulse['outputValue']
-    )
+    global PULSE_KEYS
+    get_pulse_val = lambda k: pulse[k].get_json_value()
+    return tuple( map(get_pulse_val, PULSE_KEYS) )
 
 class BeaconStorage:
     def __init__(self):
@@ -147,14 +109,17 @@ class BeaconStorage:
             c.close()
 
     def fetchLatestPulse(self):
+        global PULSE_KEYS
         con = self.dbConnection
         c = None
         try:
             c = con.cursor()
+            keys = PULSE_KEYS
             c.execute("""
-                SELECT * FROM {tableName} ORDER BY timeStamp DESC LIMIT 1
+                SELECT {fields} FROM {tableName} ORDER BY timeStamp DESC LIMIT 1
             """.format(
-                tableName=DB_TABLE
+                tableName = DB_TABLE,
+                fields = ', '.join(keys),
             ))
             row = c.fetchone()
             if row == None:
@@ -167,19 +132,20 @@ class BeaconStorage:
                 c.close()
 
     def add_pulse(self, pulse):
+        global PULSE_KEYS
         assert_next_in_chain(self.lastPulse, pulse)
         con = self.dbConnection
         c = None
         try:
             c = con.cursor()
-            keys = pulse.keys()
+            keys = PULSE_KEYS
             c.execute(
                 "INSERT INTO {tableName}({fields}) VALUES ({placeholders})".format(
                     tableName = DB_TABLE,
                     fields = ', '.join(keys),
-                    placeholders = ':' + ', :'.join(keys)
+                    placeholders = ', '.join(['?'] * len(keys))
                 ),
-                pulse
+                to_row(pulse)
             )
             con.commit()
             self.lastPulse = pulse
@@ -203,9 +169,11 @@ if __name__ == '__main__':
 
     while True:
         try:
-            pulse = socket.recv_json()
-            print("received pulse {pulseIndex}, chain {chainIndex}".format(**pulse))
-            print(json.dumps(pulse, sort_keys=True, indent=4))
+            dict = socket.recv_json()
+            print("received pulse {pulseIndex}, chain {chainIndex}".format(**dict))
+            print(json.dumps(dict, sort_keys=True, indent=4))
+
+            pulse = pulse_from_dict(dict)
             store.add_pulse(pulse)
             print("stored successfully")
             socket.send(b'{"ok":true}')

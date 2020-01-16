@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta
-from .types import *
 
 def encode_uint64(n):
     # big endian byte encoding
@@ -19,6 +18,8 @@ def encode_bytes(bstr):
 def encode_str(str):
     # variable length types will have their byte length prefixed
     return encode_bytes(str.encode('utf-8')) # to byte string
+
+from .types import BeaconType
 
 # Ref: 4.1.2 Byte serialization of fields
 def serialize_field_value(value):
