@@ -3,7 +3,6 @@ Types used in a pulse
 """
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
-from .serialization import *
 
 """
 base abstract class
@@ -38,6 +37,8 @@ class BeaconType(ABC):
     @abstractmethod
     def serialize(self):
         pass
+
+from .serialization import *
 
 """
 Type representing a 32 bit integer

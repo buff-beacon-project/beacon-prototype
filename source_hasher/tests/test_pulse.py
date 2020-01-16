@@ -1,5 +1,5 @@
 import unittest
-from pulse import get_pulse_uri
+from beacon_shared.pulse import get_pulse_uri
 
 class TestPulse(unittest.TestCase):
 

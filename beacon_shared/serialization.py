@@ -1,5 +1,5 @@
-import numpy as np
 from datetime import datetime, timedelta
+from .types import *
 
 def encode_uint64(n):
     # big endian byte encoding
@@ -22,32 +22,9 @@ def encode_str(str):
 
 # Ref: 4.1.2 Byte serialization of fields
 def serialize_field_value(value):
-    # dateStr
-    if isinstance(value, datetime):
-        return encode_str(value.isoformat())
-    # string
-    if isinstance(value, str):
-        return encode_str(value)
-    # uint64
-    if isinstance(value, np.uint64):
-        return encode_uint64(int(value))
-    # uint32
-    if isinstance(value, np.uint32):
-        return encode_uint32(int(value))
-    # duration... for period
-    if isinstance(value, timedelta):
-        return encode_uint32(int(value.total_seconds() * 1000))
-
-    t = type(value)
-    # builtin int type
-    if t is int:
-        return encode_uint64(value)
-
-    # for hashes
-    if t is bytes:
-        return encode_bytes(value)
-
-    raise TypeError('Serialize is not implemented for type {}'.format(t))
+    if not isinstance(value, BeaconType):
+        raise TypeError('Serialization is only defined for types that inherit BeaconType')
+    return value.serialize()
 
 # serialize the values and then concatenate them
 def concat_serialize(values):

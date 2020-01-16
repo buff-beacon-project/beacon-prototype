@@ -1,6 +1,7 @@
 import unittest
 from hasher import Hasher
 from sys import getsizeof
+from beacon_shared.types import *
 
 class TestHasher(unittest.TestCase):
 
@@ -8,7 +9,7 @@ class TestHasher(unittest.TestCase):
         self.hasher = Hasher(False) # no hsm
 
     def test_hashing(self):
-        hash = self.hasher.hash(1)
+        hash = self.hasher.hash(UInt64(1))
         self.assertEqual(
             hash.hex(),
             # hash of "1" with SHA512

@@ -9,7 +9,8 @@ from cryptography.hazmat.primitives import hashes       #for signing
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 from cryptography.hazmat.primitives.asymmetric import padding, ec, rsa, utils   #for signing
 
-from serialization import serialize_field_value, concat_serialize
+from beacon_shared.serialization import serialize_field_value, concat_serialize
+from beacon_shared.types import ByteHash
 
 # Utility class for hashing and signing, with or without HSM support
 class Hasher:
@@ -38,7 +39,7 @@ class Hasher:
 
     def store_public_key(self):
         self.public_key = self.hsm_asym_key.get_public_key() if self.use_hsm else self.private_key.public_key()
-        self.public_key_id = self.hash(self.get_public_key_bytes())
+        self.public_key_id = self.hash(ByteHash(self.get_public_key_bytes()))
         # TODO: send message to store public key using public key hash
 
     # TODO: make this better

@@ -2,10 +2,10 @@ import os
 import time
 from datetime import datetime
 import zmq
-import pulse
+import .beacon_shared.pulse
 import hasher
 from threading import Timer
-from config import MAX_TIMEDELTA
+from .beacon_shared.config import MAX_TIMEDELTA
 from exceptions import LatePulseException, PulseTimeException
 
 def get_zmq_socket(port):
