@@ -66,9 +66,12 @@ class String(BeaconType):
 
 """
 Type representing a datetime
+Note: Does not match specs. Length is 16 and does not have "Z"
+as terminating value. This is ISO standard.
 """
 class DateTime(BeaconType):
     def set(self, value):
+        DATETIME_RESOLUTION = timedelta(microseconds=1000)
         if isinstance(value, datetime):
             self.value = value
             return

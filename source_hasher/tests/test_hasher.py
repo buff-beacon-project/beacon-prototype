@@ -12,7 +12,7 @@ class TestHasher(unittest.TestCase):
         self.assertEqual(
             hash.hex(),
             # hash of "1" with SHA512
-            '4dff4ea340f0a823f15d3f4f01ab62eae0e5da579ccb851f8db9dfe84c58b2b37b89903a740e1ee172da793a6e79d560e5f7f9bd058a12a280433ed6fa46510a'
+            'df9c478c05321087b50a1d239b4aab290e9b793252758e706e24312aed21c29072285e436a20c3c6227f99b73638f0414fba5835586fee4e19231c1ec56d58ee'
         )
 
 if __name__ == '__main__':
