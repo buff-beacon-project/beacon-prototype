@@ -143,6 +143,9 @@ class TestSkiplist(unittest.TestCase):
         self.assertEqual(skiplist, EXPECTED_SKIP_LIST)
 
     def testHighestLayerPower(self):
+        anchorPosition = self.skiplayers.getHighestLayerPower([0, 0, 0, 0])
+        self.assertEqual(anchorPosition, 3)
+
         anchorPosition = self.skiplayers.getHighestLayerPower([0, 2, 3, 0])
         self.assertEqual(anchorPosition, 1)
 

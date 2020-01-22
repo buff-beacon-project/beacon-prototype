@@ -127,3 +127,23 @@ class ByteHash(BeaconType):
 
     def serialize(self):
         return encode_bytes(self.value)
+
+"""
+Type representing a list of skiplist anchors
+"""
+class SkipAnchors(BeaconType):
+    def set(self, value):
+        if type(value) is not list:
+            raise TypeError('Can not set beacon SkipAnchors type from value provided. Must be a list of ByteHashe types')
+
+        for b in value:
+            if not isinstance(b, ByteHash):
+                raise TypeError('Can not set beacon SkipAnchors type from value provided. Must be a list of ByteHashe types')
+
+        self.value = value
+
+    def get_json_value(self):
+        return [b.get_json_value() for b in self.value]
+
+    def serialize(self):
+        return b''.join([b.serialize() for b in self.value])

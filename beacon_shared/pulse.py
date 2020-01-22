@@ -30,18 +30,14 @@ def pulse_from_dict(fields):
         ('localRandomValue', ByteHash(fields['localRandomValue'])),
         # TODO external sources
         # ...
-        ('previous', ByteHash(fields['previous'])),
-        ('hour', ByteHash(fields['hour'])),
-        ('day', ByteHash(fields['day'])),
-        ('month', ByteHash(fields['month'])),
-        ('year', ByteHash(fields['year'])),
+        ('anchors', SkipAnchors(fields['anchors'])),
         ('precommitmentValue', ByteHash(fields['precommitmentValue'])),
         ('statusCode', UInt32(fields['statusCode'])),
         ('signatureValue', ByteHash(fields['signatureValue'])),
         ('outputValue', ByteHash(fields['outputValue']))
     ])
 
-def init_pulse(hasher, chain_index, previous_pulse, hour_value, day_value, month_value, year_value):
+def init_pulse(hasher, chain_index, previous_pulse):
     global EMPTY_HASH
     # meta information
     pulse_index = 1
@@ -71,11 +67,9 @@ def init_pulse(hasher, chain_index, previous_pulse, hour_value, day_value, month
         'localRandomValue': local_random_value,
         # TODO external sources
         # ...
-        'previous': EMPTY_HASH,
-        'hour': hour_value,
-        'day': day_value,
-        'month': month_value,
-        'year': year_value,
+        'skipListLayerSize': 0, # set later
+        'skipListNumLayers': 0, # set later
+        'anchors': [], # set later
         'precommitmentValue': EMPTY_HASH,
         'statusCode': status_code,
         'signatureValue': EMPTY_HASH,
@@ -96,9 +90,12 @@ def get_pulse_values(pulse, until_field = None):
 def get_pulse_hash(hasher, pulse, until_field = None):
     return hasher.hash_many(get_pulse_values(pulse, until_field))
 
-def finalize_pulse(hasher, pulse, previous_pulse, next_pulse):
+# expecting skip_list_anchors = { "layerSize", "numLayers", "pulses": [pulse, ...] }
+def finalize_pulse(hasher, pulse, skip_list_anchors, next_pulse):
     global EMPTY_HASH
-    pulse['previous'] = previous_pulse['outputValue'] if previous_pulse != None else ByteHash(EMPTY_HASH)
+    pulse['skipListLayerSize'] = UInt32(skip_list_anchors['layerSize'])
+    pulse['skipListNumLayers'] = UInt32(skip_list_anchors['numLayers'])
+    pulse['skipListAnchors'] = SkipAnchors([p['outputValue'] for p in skip_list_anchors['pulses']])
     pulse['precommitmentValue'] = ByteHash(hasher.hash(next_pulse['localRandomValue']))
     # sign the hash of all
     values_to_sign = get_pulse_values(pulse, 'signatureValue')
