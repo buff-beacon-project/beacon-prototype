@@ -1,4 +1,4 @@
-from math import floor
+from math import floor, log
 from functools import reduce
 
 class SkipLayers:
@@ -27,57 +27,42 @@ class SkipLayers:
     Gives a list of layer indicies in increasing order
     that represents the shortest skiplist between two indicies
     """
-    def getSkiplistPath(self, index1, index2):
-        # get to layer indicies
-        orig = self.toLayerIndicies(index1) if type(index1) == int else index1
-        dest = self.toLayerIndicies(index2) if type(index2) == int else index2
+    def getSkiplistPath(self, src, dst):
+        n = self.layerSize
+        p = self.numLayers - 1
 
-        # convert to plain index if needed
-        index1 = self.fromLayerIndicies(index1) if type(index1) != int else index1
-        index2 = self.fromLayerIndicies(index2) if type(index2) != int else index2
+        # convert layer indicies to integers if necessary
+        src = src if type(src) == int else self.fromLayerIndicies(src)
+        dst = dst if type(dst) == int else self.fromLayerIndicies(dst)
 
-        path = []
+        if src < 0 or dst < 0:
+            raise Error('Invalid indicies src: {}, dst: {}'.format(src, dst))
 
-        # no path
-        if index1 == index2:
-            return path
+        # no path... they are the same
+        if src == dst:
+            return []
 
-        if index2 < index1:
-            #swap
-            index2, index1 = index1, index2
-            dest, orig = orig, dest
+        if src > dst:
+            raise Error('First index is greater than second index')
 
-        prev = [0] * self.numLayers # zeros index
-        startAt = 0
-        fromIndex = 0
-        for layer in range(self.numLayers):
-            destIndex = dest[layer]
-            origIndex = orig[layer]
+        # get the highest common base power
+        # ex: in base 10... 1483 and 1534 would be 1530
+        diff = dst - src # ex: this would be 51
+        startq = int(log(diff) // log(n)) # ex: this would be 1
+        curr = (dst // n ** startq) * (n ** startq) # ex: this would be (1534 // 10^1) * 10^1 => 1530
 
-            prev[layer] = destIndex
+        # start at this value (ex: 1530)
+        path = [curr]
 
-            # start at the largest layer down
-            if destIndex > 0 and destIndex > origIndex:
-                startAt = layer
-                fromIndex = destIndex
+        # start at current power, decrement to zero
+        for q in range(startq, -1, -1):
+            if curr < src:
                 break
 
-        print('startAt {}'.format(startAt))
-
-        for layer in range(startAt, self.numLayers):
-            print('layer {}'.format(layer))
-            destIndex = dest[layer]
-            origIndex = orig[layer]
-
-            if destIndex == origIndex:
-                prev[layer] = destIndex
-                continue
-
-            for idx in range(fromIndex, origIndex, -1):
-                prev[layer] = idx
-                path.insert(0, prev[:]) # prepend clone
-
-            prev[layer] -= 1
-            fromIndex = self.layerSize
+            pow = n ** q
+            while curr - pow > src:
+                # decrease by one base power each time and add to list
+                curr -= pow
+                path.insert(0, curr)
 
         return path

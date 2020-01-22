@@ -36,6 +36,7 @@ class TestSkiplist(unittest.TestCase):
     def testSkiplist(self):
         skiplist = self.skiplayers.getSkiplistPath([0, 0, 2, 0], [0, 4, 1, 1])
         pp = pprint.PrettyPrinter(indent=4)
+        # pp.pprint(skiplist)
         pp.pprint(skiplist)
 
 
