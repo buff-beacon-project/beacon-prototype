@@ -48,7 +48,7 @@ class SkipLayers:
         # get the highest common base power
         # ex: in base 10... 1483 and 1534 would be 1530
         diff = dst - src # ex: this would be 51
-        startq = int(log(diff) // log(n)) # ex: this would be 1
+        startq = int(min(log(diff) // log(n), p)) # ex: this would be 1
         curr = (dst // n ** startq) * (n ** startq) # ex: this would be (1534 // 10^1) * 10^1 => 1530
 
         # start at this value (ex: 1530)
