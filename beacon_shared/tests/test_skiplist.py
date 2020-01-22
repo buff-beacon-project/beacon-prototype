@@ -107,7 +107,7 @@ EXPECTED_SKIP_LIST = [
 
 class TestSkiplist(unittest.TestCase):
     def setUp(self):
-        self.skiplayers = SkipLayers(4, 27)
+        self.skiplayers = SkipLayers(27, 4)
 
     def testToLayerIndicies(self):
         indicies = self.skiplayers.toLayerIndicies(2)
