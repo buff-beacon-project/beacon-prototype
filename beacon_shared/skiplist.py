@@ -2,6 +2,26 @@ from math import log
 from functools import reduce
 
 """
+Get the highest layer for which this (pulse) index
+is an anchor for.
+For example: in base 10, for the following indicies...
+1560 => 1
+1264 => 0
+3000 => 3
+3070 => 2
+"""
+def getHighestLayerPower(layerSize, numLayers, index):
+    n = layerSize
+    p = numLayers - 1
+    if index % n != 0:
+        return 0
+    pow = 1
+    while pow <= p and index % (n ** pow) == 0:
+        pow += 1
+    return pow - 1
+
+
+"""
 Gives a list of layer indicies in increasing order
 that represents the shortest skiplist between two indicies
 for a given layer size and number of layers.
@@ -63,6 +83,10 @@ class SkipLayers:
             zip(layerIndicies, self.powers),
             0
         )
+
+    def getHighestLayerPower(self, index):
+        index = index if type(index) == int else self.fromLayerIndicies(index)
+        return getHighestLayerPower(self.layerSize, self.numLayers, index)
 
     """
     Gives a list of layer indicies in increasing order

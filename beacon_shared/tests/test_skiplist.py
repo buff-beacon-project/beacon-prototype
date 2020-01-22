@@ -135,13 +135,25 @@ class TestSkiplist(unittest.TestCase):
         idx = self.skiplayers.fromLayerIndicies([54, 0, 0, 1])
         self.assertEqual(idx, 2 * 27 ** 4 + 1)
 
-
     def testSkiplist(self):
         global EXPECTED_SKIP_LIST
         skiplist = self.skiplayers.getSkiplistPath([0, 0, 2, 6], [30, 4, 2, 1])
         pp = pprint.PrettyPrinter(indent=4)
         skiplist = [self.skiplayers.toLayerIndicies(x) for x in skiplist]
         self.assertEqual(skiplist, EXPECTED_SKIP_LIST)
+
+    def testHighestLayerPower(self):
+        anchorPosition = self.skiplayers.getHighestLayerPower([0, 2, 3, 0])
+        self.assertEqual(anchorPosition, 1)
+
+        anchorPosition = self.skiplayers.getHighestLayerPower([50, 5, 0, 0])
+        self.assertEqual(anchorPosition, 2)
+
+        anchorPosition = self.skiplayers.getHighestLayerPower([0, 5, 0, 2])
+        self.assertEqual(anchorPosition, 0)
+
+        anchorPosition = self.skiplayers.getHighestLayerPower([60, 0, 0, 0])
+        self.assertEqual(anchorPosition, 3)
 
 
 if __name__ == '__main__':
