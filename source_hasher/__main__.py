@@ -81,7 +81,7 @@ class Controller:
         else:
             delay = target - now
             # wait until timestamp time
-            print(delay.total_seconds())
+            # print(delay.total_seconds())
             t = Timer(delay.total_seconds(), self.emit_pulse)
             t.start()
             t.join()
@@ -96,6 +96,7 @@ class Controller:
         self.next_pulse = None
 
         while True:
+            # self.emit_pulse()
             self.wait_and_emit_next_pulse()
 
 
