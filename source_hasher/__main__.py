@@ -38,22 +38,12 @@ class Controller:
             raise Exception(response['error']['message'])
 
     def prepare_next_pulse(self):
-        chain_index = 1
-
-        TEST_HASH = self.hasher.hash(UInt64(1))
-        hour_value = TEST_HASH
-        day_value = TEST_HASH
-        month_value = TEST_HASH
-        year_value = TEST_HASH
+        chain_index = 0
 
         self.next_pulse = pulse.init_pulse(
             self.hasher,
             chain_index,
-            self.current_pulse,
-            hour_value,
-            day_value,
-            month_value,
-            year_value
+            self.current_pulse
         )
 
     def emit_pulse(self):

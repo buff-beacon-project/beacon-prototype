@@ -22,11 +22,9 @@ PULSE_KEYS = [
     'localRandomValue',
     # TODO external sources
     # ...
-    'previous',
-    'hour',
-    'day',
-    'month',
-    'year',
+    'skipListLayerSize',
+    'skipListNumLayers',
+    'skipListAnchors',
     'precommitmentValue',
     'statusCode',
     'signatureValue',
@@ -39,28 +37,39 @@ class PulseChainException(Exception):
 def assert_next_in_chain(lastPulse, currentPulse):
     # TODO make this check signatures
     if lastPulse is None:
-        if currentPulse['chainIndex'].get() != 1 or currentPulse['pulseIndex'].get() != 1:
-            raise PulseChainException('Expecting first pulse in first chain but received chain {}, pulse {}'.format(currentPulse['chainIndex'], currentPulse['pulseIndex']))
+        if currentPulse['chainIndex'].get() != 0 or currentPulse['pulseIndex'].get() != 0:
+            raise PulseChainException('Expecting first pulse in first chain but received chain {}, pulse {}'.format(currentPulse['chainIndex'].get(), currentPulse['pulseIndex'].get()))
         return
     if lastPulse['chainIndex'].get() != currentPulse['chainIndex'].get():
-        if currentPulse['pulseIndex'].get() != 1:
+        if currentPulse['pulseIndex'].get() != 0:
             raise PulseChainException('Received pulse has new chain index but is not first pulse')
     else:
         if currentPulse['pulseIndex'].get() != lastPulse['pulseIndex'].get() + 1:
             raise PulseChainException('Received pulse is not next in chain')
 
-    if lastPulse['outputValue'].get() != currentPulse['previous'].get():
-        raise PulseChainException('Received pulse "previous" value does not match last pulse "outputValue"')
+    if lastPulse['outputValue'].get() != currentPulse['skipListAnchors'].get()[0].get():
+        raise PulseChainException('Received pulse previous pulse value does not match current pulse "outputValue"')
 
 # convert sql row to pulse
 def from_row(row):
     global PULSE_KEYS
-    return pulse_from_dict( dict( zip(PULSE_KEYS, row) ) )
+    d = dict( zip(PULSE_KEYS, row) )
+
+    # unserialize the anchors
+    d['skipListAnchors'] = d['skipListAnchors'].split(':')
+
+    return pulse_from_dict( d )
 
 def to_row( pulse ):
     global PULSE_KEYS
     get_pulse_val = lambda k: pulse[k].get_json_value()
-    return tuple( map(get_pulse_val, PULSE_KEYS) )
+    ret = list(map(get_pulse_val, PULSE_KEYS))
+
+    n = PULSE_KEYS.index('skipListAnchors')
+    # serialize the anchors
+    ret[n] = ':'.join(ret[n])
+
+    return tuple(ret)
 
 class BeaconStorage:
     def __init__(self):
@@ -86,11 +95,9 @@ class BeaconStorage:
                     timeStamp text NOT NULL,
                     localRandomValue text NOT NULL,
 
-                    previous text NOT NULL,
-                    hour text NOT NULL,
-                    day text NOT NULL,
-                    month text NOT NULL,
-                    year text NOT NULL,
+                    skipListLayerSize integer NOT NULL,
+                    skipListNumLayers integer NOT NULL,
+                    skipListAnchors text NOT NULL,
                     precommitmentValue text NOT NULL,
                     statusCode integer NOT NULL,
                     signatureValue text NOT NULL,

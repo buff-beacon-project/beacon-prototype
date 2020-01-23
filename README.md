@@ -51,6 +51,12 @@ $ pipenv run python3 -m unittest discover
 [ ] check docker permissions and get rid of privileged: true
 [ ] use https for communication with HSM??
 
+# Spec changes
+
+1. Pulse index must start at zero if first in chain
+2. previous, hour, day, month, year are changed in favour of skipListAnchors, skipListLayerSize, skipListNumLayers
+3. For conventional simplicity, chainIndex starts at 0
+
 # References for development
 
 * https://nvlpubs.nist.gov/nistpubs/ir/2019/NIST.IR.8213-draft.pdf

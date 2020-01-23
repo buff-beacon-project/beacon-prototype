@@ -25,7 +25,7 @@ services:
             - ./beacon_shared:/beacon_shared
         environment:
             ZMQ_BROADCAST_PORT: 5050
-            USE_HSM: 1
+            USE_HSM: 0
         # ports:
         #     - "5050:5050"
         command: ["python3", "/app"]

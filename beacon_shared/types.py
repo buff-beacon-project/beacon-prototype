@@ -136,11 +136,12 @@ class SkipAnchors(BeaconType):
         if type(value) is not list:
             raise TypeError('Can not set beacon SkipAnchors type from value provided. Must be a list of ByteHashe types')
 
+        self.value = []
         for b in value:
-            if not isinstance(b, ByteHash):
-                raise TypeError('Can not set beacon SkipAnchors type from value provided. Must be a list of ByteHashe types')
-
-        self.value = value
+            if isinstance(b, ByteHash):
+                self.value.append(ByteHash(b.get()))
+            else:
+                self.value.append(ByteHash(b))
 
     def get_json_value(self):
         return [b.get_json_value() for b in self.value]

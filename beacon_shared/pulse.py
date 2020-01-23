@@ -4,7 +4,8 @@ from time import time
 from collections import OrderedDict
 from .status_codes import *
 from .types import *
-from .config import BEACON_VERSION, CYPHER_SUITE, PERIOD
+from .config import BEACON_VERSION, CYPHER_SUITE, PERIOD, SKIP_LIST_LAYER_SIZE, SKIP_LIST_NUM_LAYERS
+from .skiplist import getHighestLayerPower
 
 EMPTY_HASH = '0'*128
 
@@ -30,7 +31,9 @@ def pulse_from_dict(fields):
         ('localRandomValue', ByteHash(fields['localRandomValue'])),
         # TODO external sources
         # ...
-        ('anchors', SkipAnchors(fields['anchors'])),
+        ('skipListLayerSize', UInt32(fields['skipListLayerSize'])),
+        ('skipListNumLayers', UInt32(fields['skipListNumLayers'])),
+        ('skipListAnchors', SkipAnchors(fields['skipListAnchors'])),
         ('precommitmentValue', ByteHash(fields['precommitmentValue'])),
         ('statusCode', UInt32(fields['statusCode'])),
         ('signatureValue', ByteHash(fields['signatureValue'])),
@@ -40,11 +43,15 @@ def pulse_from_dict(fields):
 def init_pulse(hasher, chain_index, previous_pulse):
     global EMPTY_HASH
     # meta information
-    pulse_index = 1
+    # Pulse index starts at zero
+    pulse_index = 0
     last_time = datetime.today() - PERIOD
     status_code = STATUS_FIRST_PULSE
 
     if previous_pulse != None:
+        if previous_pulse['chainIndex'].get() != chain_index:
+            raise Error('Chain index provided does not match previous pulse!')
+
         pulse_index = previous_pulse['pulseIndex'].get() + 1
         last_time = previous_pulse['timeStamp'].get()
         status_code = STATUS_OK
@@ -67,13 +74,13 @@ def init_pulse(hasher, chain_index, previous_pulse):
         'localRandomValue': local_random_value,
         # TODO external sources
         # ...
-        'skipListLayerSize': 0, # set later
-        'skipListNumLayers': 0, # set later
-        'anchors': [], # set later
-        'precommitmentValue': EMPTY_HASH,
+        'skipListLayerSize': SKIP_LIST_LAYER_SIZE,
+        'skipListNumLayers': SKIP_LIST_NUM_LAYERS,
+        'skipListAnchors': [], # set later
+        'precommitmentValue': EMPTY_HASH, # set later
         'statusCode': status_code,
-        'signatureValue': EMPTY_HASH,
-        'outputValue': EMPTY_HASH
+        'signatureValue': EMPTY_HASH, # set later
+        'outputValue': EMPTY_HASH # set later
     })
 
     return pulse
@@ -90,12 +97,27 @@ def get_pulse_values(pulse, until_field = None):
 def get_pulse_hash(hasher, pulse, until_field = None):
     return hasher.hash_many(get_pulse_values(pulse, until_field))
 
-# expecting skip_list_anchors = { "layerSize", "numLayers", "pulses": [pulse, ...] }
-def finalize_pulse(hasher, pulse, skip_list_anchors, next_pulse):
+
+def get_skip_list_anchors(previous_pulse):
+
+    if previous_pulse is None:
+        return SkipAnchors([EMPTY_HASH] * SKIP_LIST_NUM_LAYERS)
+
+    n = 1 + getHighestLayerPower(
+        previous_pulse['skipListLayerSize'].get(),
+        previous_pulse['skipListNumLayers'].get(),
+        previous_pulse['pulseIndex'].get()
+    )
+
+    # first n values are previous pulse's output value
+    hashes = [ previous_pulse['outputValue'] ] * n
+    # the rest are the existing layer anchors
+    hashes += (previous_pulse['skipListAnchors'].get())[n:]
+    return SkipAnchors(hashes)
+
+def finalize_pulse(hasher, pulse, previous_pulse, next_pulse):
     global EMPTY_HASH
-    pulse['skipListLayerSize'] = UInt32(skip_list_anchors['layerSize'])
-    pulse['skipListNumLayers'] = UInt32(skip_list_anchors['numLayers'])
-    pulse['skipListAnchors'] = SkipAnchors([p['outputValue'] for p in skip_list_anchors['pulses']])
+    pulse['skipListAnchors'] = get_skip_list_anchors(previous_pulse)
     pulse['precommitmentValue'] = ByteHash(hasher.hash(next_pulse['localRandomValue']))
     # sign the hash of all
     values_to_sign = get_pulse_values(pulse, 'signatureValue')
