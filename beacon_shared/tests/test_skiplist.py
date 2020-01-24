@@ -3,6 +3,7 @@ from ..skiplist import SkipLayers
 import pprint
 
 EXPECTED_SKIP_LIST = [
+    [0, 0, 2, 6],
     [0, 0, 2, 7],
     [0, 0, 2, 8],
     [0, 0, 2, 9],
@@ -102,7 +103,8 @@ EXPECTED_SKIP_LIST = [
     [27, 0, 0, 0],
     [28, 0, 0, 0],
     [29, 0, 0, 0],
-    [30, 0, 0, 0]
+    [30, 0, 0, 0],
+    [30, 4, 2, 1]
 ]
 
 class TestSkiplist(unittest.TestCase):

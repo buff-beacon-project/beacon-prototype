@@ -53,3 +53,16 @@ services:
         #     - "5050:5050"
         tty: true
         command: ["python3", "/app"]
+
+    beacon-api:
+        image: "beacon-api"
+        build: "./beacon_api"
+        volumes:
+            # for development
+            - ./beacon_api/:/app
+            - ./beacon_shared:/beacon_shared
+            - ./beacon_storage/beacon.db:/db/beacon.db:ro
+        ports:
+            - "8080:80"
+        tty: true
+        command: ["gunicorn", "--reload", "-c", "/app/gunicorn.conf.py", "main:api"]

@@ -10,6 +10,7 @@ RUN apk update \
     # python3 \
     python3-dev \
     zeromq-dev \
+  && pip3 install --upgrade pip \
   && pip3 install pipenv --no-cache-dir \
   && rm -rf /var/cache/apk/*
 

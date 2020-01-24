@@ -47,7 +47,8 @@ def getSkiplistPath(layerSize, numLayers, src, dst):
     curr = (dst // n ** startq) * (n ** startq) # ex: this would be (1534 // 10^1) * 10^1 => 1530
 
     # start at this value (ex: 1530)
-    path = [curr]
+
+    path = [curr, dst] if curr != dst else [dst]
 
     # start at current power, decrement to zero
     for q in range(startq, -1, -1):
@@ -60,6 +61,7 @@ def getSkiplistPath(layerSize, numLayers, src, dst):
             curr -= pow
             path.insert(0, curr)
 
+    path.insert(0, src)
     return path
 
 class SkipLayers:
