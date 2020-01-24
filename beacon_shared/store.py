@@ -1,9 +1,11 @@
 import os
 import sqlite3
+from .types import ByteHash
 from .pulse import PULSE_KEYS, pulse_to_plain_dict, pulse_from_dict, assert_next_in_chain
 
 BEACON_DB_PATH=os.getenv('BEACON_DB_PATH', './beacon.db')
 BEACON_DB_TABLE = 'beacon_records'
+BEACON_DB_CERT_TABLE = 'beacon_certificates'
 
 # convert sql row to pulse
 def from_row(row):
@@ -44,7 +46,7 @@ class BeaconStore:
             c.execute("""
                 CREATE TABLE IF NOT EXISTS {tableName}
                 (
-                    ID integer PRIMARY KEY AUTOINCREMENT,
+                    id integer PRIMARY KEY AUTOINCREMENT,
                     uri text NOT NULL,
                     version text NOT NULL,
                     cypherSuite text NOT NULL,
@@ -68,6 +70,18 @@ class BeaconStore:
             ))
             c.execute('CREATE INDEX IF NOT EXISTS {tableName}_ts ON {tableName} (timeStamp)'.format(tableName=BEACON_DB_TABLE))
             con.commit()
+
+            c.execute("""
+                CREATE TABLE IF NOT EXISTS {tableName}
+                (
+                    id text PRIMARY KEY,
+                    certificate text NOT NULL
+                )
+            """.format(
+                tableName=BEACON_DB_CERT_TABLE
+            ))
+            con.commit()
+
         except Exception as e:
             if con:
                 con.close()
@@ -75,7 +89,48 @@ class BeaconStore:
         finally:
             c.close()
 
-    def add_pulse(self, pulse):
+    def addCertificate(self, id, cert):
+        con = self.dbConnection
+        c = None
+        try:
+            c = con.cursor()
+            keys = PULSE_KEYS
+            c.execute(
+                "INSERT INTO {tableName}(id, certificate) VALUES (?, ?)".format(
+                    tableName = BEACON_DB_CERT_TABLE
+                ),
+                (id, cert)
+            )
+            con.commit()
+        except Exception as e:
+            raise e
+        finally:
+            if c:
+                c.close()
+
+    def fetchCertificateByteHash(self, id):
+        con = self.dbConnection
+        c = None
+        try:
+            c = con.cursor()
+            keys = PULSE_KEYS
+            query = ' '.join((
+                'SELECT id, certificate FROM {tableName}',
+                'WHERE id = ?'
+                'LIMIT 1'
+            ))
+            c.execute(query.format(
+                tableName = BEACON_DB_CERT_TABLE
+            ), (id,))
+            (id, cert) = c.fetchone()
+            return ByteHash(cert)
+        except Exception as e:
+            raise e
+        finally:
+            if c:
+                c.close()
+
+    def addPulse(self, pulse):
         lastPulse = self.fetchLatestPulse()
         assert_next_in_chain(lastPulse, pulse)
 
@@ -99,18 +154,22 @@ class BeaconStore:
             if c:
                 c.close()
 
-    def fetchLatestPulse(self):
+    def queryOnePulse(self, where = '', order = '', params = ()):
         con = self.dbConnection
         c = None
         try:
             c = con.cursor()
             keys = PULSE_KEYS
-            c.execute("""
-                SELECT {fields} FROM {tableName} ORDER BY timeStamp DESC LIMIT 1
-            """.format(
+            query = ' '.join((
+                'SELECT {fields} FROM {tableName}',
+                where,
+                order,
+                'LIMIT 1'
+            ))
+            c.execute(query.format(
                 tableName = BEACON_DB_TABLE,
                 fields = ', '.join(keys),
-            ))
+            ), params)
             row = c.fetchone()
             if row == None:
                 return None
@@ -121,27 +180,11 @@ class BeaconStore:
             if c:
                 c.close()
 
+    def fetchLatestPulse(self):
+        return self.queryOnePulse('ORDER BY timeStamp DESC')
+
     def fetchPulse(self, chain, pulse):
-        con = self.dbConnection
-        c = None
-        try:
-            c = con.cursor()
-            keys = PULSE_KEYS
-            c.execute("""
-                SELECT {fields} FROM {tableName} WHERE chainIndex=? AND pulseIndex=? LIMIT 1
-            """.format(
-                tableName = BEACON_DB_TABLE,
-                fields = ', '.join(keys),
-            ), (chain, pulse))
-            row = c.fetchone()
-            if row == None:
-                return None
-            return from_row(row)
-        except Exception as e:
-            raise e
-        finally:
-            if c:
-                c.close()
+        return self.queryOnePulse(where='WHERE chainIndex=? AND pulseIndex=?', params=(chain, pulse))
 
     def fetchManyPulses(self, chain, pulseIds):
         con = self.dbConnection
@@ -163,3 +206,15 @@ class BeaconStore:
         finally:
             if c:
                 c.close()
+
+    def fetchPulseByGeaterEqualTime(self, dt):
+        datestr = dt.isoformat()
+        return self.queryOnePulse(where='WHERE timeStamp >= ?', order='ORDER BY timeStamp ASC', params=(datestr,))
+
+    def fetchNextPulseByTime(self, dt):
+        datestr = dt.isoformat()
+        return self.queryOnePulse(where='WHERE timeStamp > ?', order='ORDER BY timeStamp ASC', params=(datestr,))
+
+    def fetchPreviousPulseByTime(self, dt):
+        datestr = dt.isoformat()
+        return self.queryOnePulse(where='WHERE timeStamp < ?', order='ORDER BY timeStamp DESC', params=(datestr,))

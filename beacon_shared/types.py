@@ -134,7 +134,7 @@ Type representing a list of skiplist anchors
 class SkipAnchors(BeaconType):
     def set(self, value):
         if type(value) is not list:
-            raise TypeError('Can not set beacon SkipAnchors type from value provided. Must be a list of ByteHashe types')
+            raise TypeError('Can not set beacon SkipAnchors type from value provided. Must be a list of ByteHash types')
 
         self.value = []
         for b in value:

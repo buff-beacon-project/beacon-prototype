@@ -11,15 +11,19 @@ if __name__ == '__main__':
     def add_pulse(data):
         print("received pulse {pulseIndex}, chain {chainIndex}".format(**data))
         print(json.dumps(data, sort_keys=True, indent=4))
-        store.add_pulse(pulse_from_dict(data))
+        store.addPulse(pulse_from_dict(data))
 
     def get_last_pulse(data):
         return pulse_to_plain_dict(store.fetchLatestPulse())
 
+    def add_certificate(data):
+        store.addCertificate(data['id'], data['certificate'])
+
     server = ZMQServer({
         # commands the server is listening to.
         'add_pulse': add_pulse,
-        'get_last_pulse': get_last_pulse
+        'get_last_pulse': get_last_pulse,
+        'add_certificate': add_certificate
     })
 
     pub_port = os.getenv('ZMQ_LISTEN_PORT', 5050)

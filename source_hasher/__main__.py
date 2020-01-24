@@ -22,6 +22,14 @@ class Controller:
 
         self.socket = get_zmq_socket(pub_port)
         self.hasher = hasher.Hasher(use_hsm)
+        # save cert in db
+        self.send({
+            'command': 'add_certificate',
+            'data': {
+                'id': self.hasher.get_public_key_id().hex(),
+                'certificate': self.hasher.get_public_key_bytes().hex()
+            }
+        })
 
     def send(self, data, as_string=False):
         socket = self.socket
