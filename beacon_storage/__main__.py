@@ -6,30 +6,7 @@ from collections import OrderedDict
 from datetime import datetime
 import zmq
 from beacon_shared.pulse import pulse_from_dict, pulse_to_plain_dict
-
-DB_SQL_FILE = 'beacon.db'
-DB_TABLE = 'beacon_records'
-
-PULSE_KEYS = [
-    'uri',
-    'version',
-    'cypherSuite',
-    'period',
-    'certificateId',
-    'chainIndex',
-    'pulseIndex',
-    'timeStamp',
-    'localRandomValue',
-    # TODO external sources
-    # ...
-    'skipListLayerSize',
-    'skipListNumLayers',
-    'skipListAnchors',
-    'precommitmentValue',
-    'statusCode',
-    'signatureValue',
-    'outputValue'
-]
+from beacon_shared.config import BEACON_DB_PATH, BEACON_DB_TABLE, PULSE_KEYS
 
 class PulseChainException(Exception):
     pass
@@ -52,7 +29,6 @@ def assert_next_in_chain(lastPulse, currentPulse):
 
 # convert sql row to pulse
 def from_row(row):
-    global PULSE_KEYS
     d = dict( zip(PULSE_KEYS, row) )
 
     # unserialize the anchors
@@ -61,7 +37,6 @@ def from_row(row):
     return pulse_from_dict( d )
 
 def to_row( pulse ):
-    global PULSE_KEYS
     get_pulse_val = lambda k: pulse[k].get_json_value()
     ret = list(map(get_pulse_val, PULSE_KEYS))
 
@@ -78,8 +53,9 @@ class BeaconStorage:
 
     def initDB(self):
         con = None
+        c = None
         try:
-            con = self.dbConnection = sqlite3.connect(DB_SQL_FILE)
+            con = self.dbConnection = sqlite3.connect(BEACON_DB_PATH)
             c = con.cursor()
             c.execute("""
                 CREATE TABLE IF NOT EXISTS {tableName}
@@ -104,9 +80,9 @@ class BeaconStorage:
                     outputValue text NOT NULL
                 )
             """.format(
-                tableName=DB_TABLE
+                tableName=BEACON_DB_TABLE
             ))
-            c.execute('CREATE INDEX IF NOT EXISTS {tableName}_ts ON {tableName} (timeStamp)'.format(tableName=DB_TABLE))
+            c.execute('CREATE INDEX IF NOT EXISTS {tableName}_ts ON {tableName} (timeStamp)'.format(tableName=BEACON_DB_TABLE))
             con.commit()
         except Exception as e:
             if con:
@@ -125,7 +101,7 @@ class BeaconStorage:
             c.execute("""
                 SELECT {fields} FROM {tableName} ORDER BY timeStamp DESC LIMIT 1
             """.format(
-                tableName = DB_TABLE,
+                tableName = BEACON_DB_TABLE,
                 fields = ', '.join(keys),
             ))
             row = c.fetchone()
@@ -148,7 +124,7 @@ class BeaconStorage:
             keys = PULSE_KEYS
             c.execute(
                 "INSERT INTO {tableName}({fields}) VALUES ({placeholders})".format(
-                    tableName = DB_TABLE,
+                    tableName = BEACON_DB_TABLE,
                     fields = ', '.join(keys),
                     placeholders = ', '.join(['?'] * len(keys))
                 ),

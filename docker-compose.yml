@@ -47,8 +47,10 @@ services:
             # for development
             - ./beacon_storage/:/app
             - ./beacon_shared:/beacon_shared
+            - ./db:/db
         environment:
             ZMQ_LISTEN_PORT: 5050
+            BEACON_DB_PATH: /db/beacon.db
         # ports:
         #     - "5050:5050"
         tty: true
@@ -57,11 +59,15 @@ services:
     beacon-api:
         image: "beacon-api"
         build: "./beacon_api"
+        depends_on:
+            - "beacon-storage"
         volumes:
             # for development
             - ./beacon_api/:/app
             - ./beacon_shared:/beacon_shared
-            - ./beacon_storage/beacon.db:/db/beacon.db:ro
+            - ./db:/db:ro
+        environment:
+            BEACON_DB_PATH: /db/beacon.db
         ports:
             - "8080:80"
         tty: true

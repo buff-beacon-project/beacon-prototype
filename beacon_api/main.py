@@ -3,35 +3,10 @@ import json
 import sqlite3
 from beacon_shared.pulse import pulse_to_plain_dict, pulse_from_dict
 from beacon_shared.skiplist import SkipLayers
-from beacon_shared.config import SKIP_LIST_LAYER_SIZE, SKIP_LIST_NUM_LAYERS
-
-DB_SQL_FILE = '/db/beacon.db'
-DB_TABLE = 'beacon_records'
-
-PULSE_KEYS = [
-    'uri',
-    'version',
-    'cypherSuite',
-    'period',
-    'certificateId',
-    'chainIndex',
-    'pulseIndex',
-    'timeStamp',
-    'localRandomValue',
-    # TODO external sources
-    # ...
-    'skipListLayerSize',
-    'skipListNumLayers',
-    'skipListAnchors',
-    'precommitmentValue',
-    'statusCode',
-    'signatureValue',
-    'outputValue'
-]
+from beacon_shared.config import SKIP_LIST_LAYER_SIZE, SKIP_LIST_NUM_LAYERS, BEACON_DB_PATH, BEACON_DB_TABLE, PULSE_KEYS
 
 # convert sql row to pulse
 def from_row(row):
-    global PULSE_KEYS
     d = dict( zip(PULSE_KEYS, row) )
 
     # unserialize the anchors
@@ -41,8 +16,9 @@ def from_row(row):
 
 class BeaconResource(object):
     def __init__(self):
+        con = None
         try:
-            con = self.dbConnection = sqlite3.connect(DB_SQL_FILE)
+            con = self.dbConnection = sqlite3.connect(BEACON_DB_PATH)
         except Exception as e:
             if con:
                 con.close()
@@ -57,7 +33,7 @@ class BeaconResource(object):
             c.execute("""
                 SELECT {fields} FROM {tableName} WHERE chainIndex=? AND pulseIndex=? LIMIT 1
             """.format(
-                tableName = DB_TABLE,
+                tableName = BEACON_DB_TABLE,
                 fields = ', '.join(keys),
             ), (chain, pulse))
             row = c.fetchone()
@@ -79,7 +55,7 @@ class BeaconResource(object):
             c.execute("""
                 SELECT {fields} FROM {tableName} WHERE chainIndex=? AND pulseIndex IN ({seq})
             """.format(
-                tableName = DB_TABLE,
+                tableName = BEACON_DB_TABLE,
                 fields = ', '.join(keys),
                 seq=','.join(['?'] * len(pulseIds))
             ), (chain,) + tuple(pulseIds))
