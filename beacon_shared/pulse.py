@@ -1,6 +1,5 @@
 import json
-from datetime import datetime, timedelta
-from time import time
+from datetime import datetime
 from collections import OrderedDict
 from .status_codes import *
 from .types import *

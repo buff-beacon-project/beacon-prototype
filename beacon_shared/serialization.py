@@ -1,4 +1,3 @@
-from datetime import datetime, timedelta
 
 def encode_uint64(n):
     # big endian byte encoding

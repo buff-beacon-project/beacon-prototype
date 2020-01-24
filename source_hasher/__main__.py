@@ -88,7 +88,6 @@ class Controller:
 
 
     def start(self):
-        chain_index = 1
         self.previous_pulse = None
         self.current_pulse = None
         self.prepare_next_pulse()

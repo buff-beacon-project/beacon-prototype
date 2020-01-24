@@ -71,7 +71,6 @@ class SkipLayers:
         self.powers = [layerSize ** m for m in range(numLayers - 1, -1, -1)]
 
     def toLayerIndicies(self, index):
-        n = self.layerSize
         mod = index
         result = []
         for power in self.powers:
