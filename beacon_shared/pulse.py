@@ -8,6 +8,27 @@ from .config import BEACON_VERSION, CYPHER_SUITE, PERIOD, SKIP_LIST_LAYER_SIZE, 
 from .skiplist import getHighestLayerPower
 
 EMPTY_HASH = '0'*128
+PULSE_KEYS = [
+    'uri',
+    'version',
+    'cypherSuite',
+    'period',
+    'certificateId',
+    'chainIndex',
+    'pulseIndex',
+    'timeStamp',
+    'localRandomValue',
+    # TODO external sources
+    # ...
+    'skipListLayerSize',
+    'skipListNumLayers',
+    'skipListAnchors',
+    'precommitmentValue',
+    'statusCode',
+    'signatureValue',
+    'outputValue'
+]
+
 
 def get_pulse_uri(chain_index, pulse_index):
     return "https://{domain}{path}/{version}/chain/{chain_index}/pulse/{pulse_index}".format(
@@ -138,3 +159,25 @@ class PulseJSONEncoder(json.JSONEncoder):
 
 def pulse_to_json(pulse, **kwargs):
     return json.dumps(pulse, cls=PulseJSONEncoder, **kwargs)
+
+
+###############
+# Verification
+class PulseChainException(Exception):
+    pass
+
+def assert_next_in_chain(lastPulse, currentPulse):
+    # TODO make this check signatures
+    if lastPulse is None:
+        if currentPulse['chainIndex'].get() != 0 or currentPulse['pulseIndex'].get() != 0:
+            raise PulseChainException('Expecting first pulse in first chain but received chain {}, pulse {}'.format(currentPulse['chainIndex'].get(), currentPulse['pulseIndex'].get()))
+        return
+    if lastPulse['chainIndex'].get() != currentPulse['chainIndex'].get():
+        if currentPulse['pulseIndex'].get() != 0:
+            raise PulseChainException('Received pulse has new chain index but is not first pulse')
+    else:
+        if currentPulse['pulseIndex'].get() != lastPulse['pulseIndex'].get() + 1:
+            raise PulseChainException('Received pulse is not next in chain')
+
+    if lastPulse['outputValue'].get() != currentPulse['skipListAnchors'].get()[0].get():
+        raise PulseChainException('Received pulse previous pulse value does not match current pulse "outputValue"')
