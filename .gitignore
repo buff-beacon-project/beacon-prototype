@@ -108,4 +108,4 @@ dmypy.json
 .pyre/
 
 .DS_Store
-beacon_storage/beacon.db
+db/beacon.db
