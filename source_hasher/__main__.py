@@ -26,8 +26,8 @@ class Controller:
         self.send({
             'command': 'add_certificate',
             'data': {
-                'id': self.hasher.get_public_key_id().hex(),
-                'certificate': self.hasher.get_public_key_bytes().hex()
+                'id': self.hasher.get_certificate_id().hex(),
+                'certificate': self.hasher.get_certificate().hex()
             }
         })
 

@@ -87,7 +87,7 @@ def init_pulse(hasher, chain_index, previous_pulse):
         'version': BEACON_VERSION,
         'cypherSuite': CYPHER_SUITE,
         'period': PERIOD,
-        'certificateId': hasher.get_public_key_id(),
+        'certificateId': hasher.get_certificate_id(),
         'chainIndex': chain_index,
         'pulseIndex': pulse_index,
         'timeStamp': time_stamp,

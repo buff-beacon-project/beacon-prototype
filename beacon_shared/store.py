@@ -108,7 +108,7 @@ class BeaconStore:
             if c:
                 c.close()
 
-    def fetchCertificateByteHash(self, id):
+    def fetchCertificateBytes(self, id):
         con = self.dbConnection
         c = None
         try:
@@ -123,7 +123,7 @@ class BeaconStore:
                 tableName = BEACON_DB_CERT_TABLE
             ), (id,))
             (id, cert) = c.fetchone()
-            return ByteHash(cert)
+            return bytes.fromhex(cert)
         except Exception as e:
             raise e
         finally:

@@ -7,7 +7,7 @@ from beacon_shared.skiplist import SkipLayers
 from beacon_shared.config import SKIP_LIST_LAYER_SIZE, SKIP_LIST_NUM_LAYERS
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.serialization import load_pem_public_key
+from cryptography import x509
 
 class BeaconResource(object):
     def __init__(self):
@@ -109,14 +109,13 @@ class CertificateResource(BeaconResource):
     def on_get(self, req, resp, id):
         # resp.status = falcon.HTTP_200  # This is the default status
         try:
-            bytehash = self.store.fetchCertificateByteHash(id)
-            if bytehash == None:
+            pem_data = self.store.fetchCertificateBytes(id)
+            if pem_data == None:
                 raise falcon.HTTPNotFound()
 
-            key = load_pem_public_key(bytehash.get(), backend=default_backend())
-            resp.body = key.public_bytes(
-                encoding=serialization.Encoding.PEM,
-                format=serialization.PublicFormat.SubjectPublicKeyInfo
+            cert = x509.load_pem_x509_certificate(pem_data, default_backend())
+            resp.body = cert.public_bytes(
+                encoding=serialization.Encoding.PEM
             )
             resp.content_type = falcon.MEDIA_TEXT
         except Exception as e:
