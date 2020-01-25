@@ -17,6 +17,7 @@ from cryptography.hazmat.primitives import hashes
 from beacon_shared.serialization import serialize_field_value, concat_serialize
 from beacon_shared.types import ByteHash
 
+# TODO: separate hasher from signer
 # Utility class for hashing and signing, with or without HSM support
 class Hasher:
     def __init__(self, use_hsm = True):

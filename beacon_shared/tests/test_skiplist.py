@@ -140,7 +140,7 @@ class TestSkiplist(unittest.TestCase):
     def testSkiplist(self):
         global EXPECTED_SKIP_LIST
         skiplist = self.skiplayers.getSkiplistPath([0, 0, 2, 6], [30, 4, 2, 1])
-        pp = pprint.PrettyPrinter(indent=4)
+        # pp = pprint.PrettyPrinter(indent=4)
         skiplist = [self.skiplayers.toLayerIndicies(x) for x in skiplist]
         self.assertEqual(skiplist, EXPECTED_SKIP_LIST)
 
