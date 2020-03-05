@@ -136,13 +136,66 @@ def get_skip_list_anchors(previous_pulse):
     return SkipAnchors(hashes)
 
 def finalize_pulse(hasher, pulse, previous_pulse, next_pulse):
-    global EMPTY_HASH
     pulse['skipListAnchors'] = get_skip_list_anchors(previous_pulse)
     pulse['precommitmentValue'] = ByteHash(hasher.hash(next_pulse['localRandomValue']))
     # sign the hash of all
     values_to_sign = get_pulse_values(pulse, 'signatureValue')
     pulse['signatureValue'] = ByteHash(hasher.sign_values(values_to_sign))
     pulse['outputValue'] = ByteHash(get_pulse_hash(hasher, pulse, 'outputValue'))
+    return pulse
+
+def get_pulse_output_value(hasher, pulse):
+    """
+    Get the pulse output value.
+    TODO: this should apply recommendation 8.3.1
+    """
+    return ByteHash(get_pulse_hash(hasher, pulse, 'outputValue'))
+
+def assemble_pulse(hasher, chain_index, local_random_value, next_local_random_value, previous_pulse):
+    """
+    Fully assemble a pulse based on the previous pulse, provided random value,
+    and the chain index.
+    """
+    global EMPTY_HASH
+    # meta information
+    # Pulse index starts at zero
+    pulse_index = 0
+    last_time = datetime.today() - PERIOD
+    status_code = STATUS_FIRST_PULSE
+
+    if previous_pulse != None and previous_pulse['chainIndex'].get() == chain_index:
+        pulse_index = previous_pulse['pulseIndex'].get() + 1
+        last_time = previous_pulse['timeStamp'].get()
+        status_code = STATUS_OK
+        # otherwise this should be the start of a new chain
+
+    time_stamp = last_time + PERIOD
+
+    pulse = pulse_from_dict({
+        'uri': get_pulse_uri(chain_index, pulse_index),
+        'version': BEACON_VERSION,
+        'cypherSuite': CYPHER_SUITE,
+        'period': PERIOD,
+        'certificateId': hasher.get_certificate_id(),
+        'chainIndex': chain_index,
+        'pulseIndex': pulse_index,
+        'timeStamp': time_stamp,
+        'localRandomValue': local_random_value,
+        # TODO external sources
+        # ...
+        'skipListLayerSize': SKIP_LIST_LAYER_SIZE,
+        'skipListNumLayers': SKIP_LIST_NUM_LAYERS,
+        'skipListAnchors': get_skip_list_anchors(previous_pulse),
+        'precommitmentValue': ByteHash(hasher.hash(next_local_random_value)),
+        'statusCode': status_code,
+        'signatureValue': EMPTY_HASH, # set later
+        'outputValue': EMPTY_HASH # set later
+    })
+
+    values_to_sign = get_pulse_values(pulse, 'signatureValue')
+    pulse['signatureValue'] = ByteHash(hasher.sign_values(values_to_sign))
+    pulse['outputValue'] = get_pulse_output_value(hasher, pulse)
+
     return pulse
 
 # helpful for preparing a pulse for transit, or encoding to json
