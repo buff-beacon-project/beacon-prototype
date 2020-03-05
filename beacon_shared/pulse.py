@@ -5,6 +5,7 @@ from .status_codes import *
 from .types import *
 from .config import BEACON_VERSION, CYPHER_SUITE, PERIOD, SKIP_LIST_LAYER_SIZE, SKIP_LIST_NUM_LAYERS
 from .skiplist import getHighestLayerPower
+from .hashing import hash, hash_many
 
 EMPTY_HASH = '0'*128
 PULSE_KEYS = [
@@ -60,6 +61,35 @@ def pulse_from_dict(fields):
         ('outputValue', ByteHash(fields['outputValue']))
     ])
 
+# get values from the pulse, in order, up until specified field
+def get_pulse_values(pulse, until_field = None):
+    pulse_values = []
+    for key, value in pulse.items():
+        if key == until_field:
+            break
+        pulse_values.append(value)
+    return pulse_values
+
+def get_pulse_hash(pulse, until_field = None):
+    return hash_many(get_pulse_values(pulse, until_field))
+
+def get_skip_list_anchors(previous_pulse):
+
+    if previous_pulse is None:
+        return SkipAnchors([EMPTY_HASH] * SKIP_LIST_NUM_LAYERS)
+
+    n = 1 + getHighestLayerPower(
+        previous_pulse['skipListLayerSize'].get(),
+        previous_pulse['skipListNumLayers'].get(),
+        previous_pulse['pulseIndex'].get()
+    )
+
+    # first n values are previous pulse's output value
+    hashes = [ previous_pulse['outputValue'] ] * n
+    # the rest are the existing layer anchors
+    hashes += (previous_pulse['skipListAnchors'].get())[n:]
+    return SkipAnchors(hashes)
+
 def init_pulse(hasher, chain_index, previous_pulse):
     global EMPTY_HASH
     # meta information
@@ -105,36 +135,6 @@ def init_pulse(hasher, chain_index, previous_pulse):
 
     return pulse
 
-# get values from the pulse, in order, up until specified field
-def get_pulse_values(pulse, until_field = None):
-    pulse_values = []
-    for key, value in pulse.items():
-        if key == until_field:
-            break
-        pulse_values.append(value)
-    return pulse_values
-
-def get_pulse_hash(hasher, pulse, until_field = None):
-    return hasher.hash_many(get_pulse_values(pulse, until_field))
-
-
-def get_skip_list_anchors(previous_pulse):
-
-    if previous_pulse is None:
-        return SkipAnchors([EMPTY_HASH] * SKIP_LIST_NUM_LAYERS)
-
-    n = 1 + getHighestLayerPower(
-        previous_pulse['skipListLayerSize'].get(),
-        previous_pulse['skipListNumLayers'].get(),
-        previous_pulse['pulseIndex'].get()
-    )
-
-    # first n values are previous pulse's output value
-    hashes = [ previous_pulse['outputValue'] ] * n
-    # the rest are the existing layer anchors
-    hashes += (previous_pulse['skipListAnchors'].get())[n:]
-    return SkipAnchors(hashes)
-
 def finalize_pulse(hasher, pulse, previous_pulse, next_pulse):
     pulse['skipListAnchors'] = get_skip_list_anchors(previous_pulse)
     pulse['precommitmentValue'] = ByteHash(hasher.hash(next_pulse['localRandomValue']))
@@ -144,14 +144,14 @@ def finalize_pulse(hasher, pulse, previous_pulse, next_pulse):
     pulse['outputValue'] = ByteHash(get_pulse_hash(hasher, pulse, 'outputValue'))
     return pulse
 
-def get_pulse_output_value(hasher, pulse):
+def get_pulse_output_value(pulse):
     """
     Get the pulse output value.
     TODO: this should apply recommendation 8.3.1
     """
-    return ByteHash(get_pulse_hash(hasher, pulse, 'outputValue'))
+    return ByteHash(get_pulse_hash(pulse, 'outputValue'))
 
-def assemble_pulse(hasher, chain_index, local_random_value, next_local_random_value, previous_pulse):
+def assemble_pulse(signer, chain_index, local_random_value, next_local_random_value, previous_pulse):
     """
     Fully assemble a pulse based on the previous pulse, provided random value,
     and the chain index.
@@ -176,7 +176,7 @@ def assemble_pulse(hasher, chain_index, local_random_value, next_local_random_va
         'version': BEACON_VERSION,
         'cypherSuite': CYPHER_SUITE,
         'period': PERIOD,
-        'certificateId': hasher.get_certificate_id(),
+        'certificateId': signer.get_certificate_id(),
         'chainIndex': chain_index,
         'pulseIndex': pulse_index,
         'timeStamp': time_stamp,
@@ -186,15 +186,15 @@ def assemble_pulse(hasher, chain_index, local_random_value, next_local_random_va
         'skipListLayerSize': SKIP_LIST_LAYER_SIZE,
         'skipListNumLayers': SKIP_LIST_NUM_LAYERS,
         'skipListAnchors': get_skip_list_anchors(previous_pulse),
-        'precommitmentValue': ByteHash(hasher.hash(next_local_random_value)),
+        'precommitmentValue': ByteHash(hash(next_local_random_value)),
         'statusCode': status_code,
         'signatureValue': EMPTY_HASH, # set later
         'outputValue': EMPTY_HASH # set later
     })
 
     values_to_sign = get_pulse_values(pulse, 'signatureValue')
-    pulse['signatureValue'] = ByteHash(hasher.sign_values(values_to_sign))
-    pulse['outputValue'] = get_pulse_output_value(hasher, pulse)
+    pulse['signatureValue'] = ByteHash(signer.sign_values(values_to_sign))
+    pulse['outputValue'] = get_pulse_output_value(pulse)
 
     return pulse
 

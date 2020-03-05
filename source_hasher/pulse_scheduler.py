@@ -1,4 +1,11 @@
-from datetime import timedelta
+import time
+from sched import scheduler
+from datetime import timedelta, datetime
+from randomness_sources import RandomnessSources
+from beacon_shared.hashing import hash_many
+from beacon_shared.pulse import assemble_pulse
+from exceptions import LatePulseException
+from signer import Signer
 
 class PulseScheduler:
     """
@@ -12,7 +19,7 @@ class PulseScheduler:
     max_local_skew_ahead - The max allowed local clock skew ahead of UTC (corresponds to $\sigma^+$)
     max_local_skew_behind - The max allowed local clock skew behind UTC (corresponds to $\sigma^-$)
     """
-    def __init__(self, period, anticipation, max_delay, max_local_skew_behind, max_local_skew_ahead):
+    def __init__(self, period, anticipation, max_delay, max_local_skew_behind, max_local_skew_ahead, use_hsm = True):
 
         for arg in [period, anticipation, max_delay, max_local_skew_ahead, max_local_skew_behind]:
             if not isinstance(arg, timedelta):
@@ -44,12 +51,16 @@ class PulseScheduler:
         self.max_local_skew_ahead = max_local_skew_ahead
         self.max_local_skew_behind = max_local_skew_behind
 
+        self.now = time.perf_counter
+        self.randomness_sources = RandomnessSources()
+        self.signer = Signer(use_hsm)
+
     @property
     def max_pulse_generation_time(self):
         """
         corresponds to $\gamma$
         """
-        return self.max_delay + self.anticipation
+        return self.max_delay + self.anticipation - self.max_local_skew_ahead
 
     def get_tuning_slack(self, pulse_generation_time):
         """
@@ -75,3 +86,65 @@ class PulseScheduler:
             self.anticipation - pulse_generation_time - self.max_local_skew_behind,
             delta_prime + self.max_local_skew_ahead
         )
+
+    def get_local_random_value(self):
+        values = self.randomness_sources.fetch()
+        return hash_many(values)
+
+    def recall_state(self):
+        # TODO implement memory
+        self.chain_index = 0
+        self.previous_pulse = None
+        self.local_random_value = None
+
+    def generate_pulse(self, next_local_random_value):
+        self.current_pulse = assemble_pulse(
+            signer = self.signer,
+            chain_index = self.chain_index,
+            local_random_value = self.local_random_value,
+            next_local_random_value = next_local_random_value,
+            previous_pulse = self.previous_pulse
+        )
+
+    def emit_pulse(self):
+        pulse = self.current_pulse
+        self.previous_pulse = self.current_pulse
+        self.current_pulse = None
+
+    def get_next_pulse_generation_delay(self):
+        if self.previous_pulse == None:
+            return timedelta(seconds=0)
+
+        next_pulse_time = self.previous_pulse["timeStamp"].get() + self.period
+        return next_pulse_time - self.anticipation
+
+    def start(self):
+        self.chain_index = 0
+        self.previous_pulse = None
+        self.current_pulse = None
+        self.local_random_value = None
+        self.recall_state()
+
+        def callback():
+            started_at = self.now()
+            next_local_random_value = self.get_local_random_value()
+            self.generate_pulse()
+            generation_time = self.now() - started_at
+            if generation_time > self.max_pulse_generation_time:
+                raise LatePulseException()
+            self.emit_pulse()
+            self.local_random_value = next_local_random_value
+
+        s = scheduler(self.now, time.sleep)
+
+        while True:
+            try:
+                delay = self.get_next_pulse_generation_delay().total_seconds()
+                if delay < 0:
+                    raise LatePulseException()
+                s.enter(delay, callback)
+                s.run(blocking = True)
+
+            # TODO handle exceptions
+            except Exception as e:
+                print(e)
