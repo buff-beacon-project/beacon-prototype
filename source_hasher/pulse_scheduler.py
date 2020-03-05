@@ -12,7 +12,7 @@ class PulseScheduler:
     max_local_skew_ahead - The max allowed local clock skew ahead of UTC (corresponds to $\sigma^+$)
     max_local_skew_behind - The max allowed local clock skew behind UTC (corresponds to $\sigma^-$)
     """
-    def __init__(self, period, anticipation, max_delay, max_local_skew_ahead, max_local_skew_behind):
+    def __init__(self, period, anticipation, max_delay, max_local_skew_behind, max_local_skew_ahead):
 
         for arg in [period, anticipation, max_delay, max_local_skew_ahead, max_local_skew_behind]:
             if not isinstance(arg, timedelta):
@@ -49,29 +49,28 @@ class PulseScheduler:
         """
         corresponds to $\gamma$
         """
-        return max_delay + anticipation
+        return self.max_delay + self.anticipation
 
-    def get_tuning_slack(self, pulse_generation_time = self.max_pulse_generation_time):
+    def get_tuning_slack(self, pulse_generation_time):
         """
         calculation of tuning slack $\eta$ based on Appendix A.1
         """
+        pulse_generation_time = self.max_pulse_generation_time if pulse_generation_time == None else pulse_generation_time
         # R5
         eta = max(self.max_local_skew_ahead, self.max_local_skew_behind)
         # R6
         eta = max(eta, self.max_delay - self.max_local_skew_behind)
         # R7
         eta = max(eta, self.anticipation - pulse_generation_time - self.max_local_skew_ahead)
-        # R8
-        eta = max(eta, pulse_generation_time)
 
         return eta
 
-    def get_time_accuracy(self, pulse_generation_time = self.max_pulse_generation_time):
+    def get_time_accuracy(self, pulse_generation_time):
         """
         calculation of time accuracy $\alpha$ based on Appendix A.1
         """
-
-        delta_prime = max(self.delay, pulse_generation_time - self.anticipation)
+        pulse_generation_time = self.max_pulse_generation_time if pulse_generation_time == None else pulse_generation_time
+        delta_prime = max(self.max_delay, pulse_generation_time - self.anticipation)
         return max(
             self.anticipation - pulse_generation_time - self.max_local_skew_behind,
             delta_prime + self.max_local_skew_ahead
