@@ -6,7 +6,7 @@ from datetime import timedelta, datetime
 from randomness_sources import RandomnessSources
 from beacon_shared.types import ByteHash
 from beacon_shared.hashing import hash_many
-from beacon_shared.pulse import assemble_pulse, set_pulse_status, pulse_to_json
+from beacon_shared.pulse import assemble_pulse, sign_pulse, set_pulse_status, pulse_to_json
 from beacon_shared.store import BeaconStore
 from exceptions import BeaconException, LatePulseException
 from signer import Signer
@@ -135,7 +135,6 @@ class PulseScheduler:
 
     def generate_pulse(self, next_local_random_value):
         self.current_pulse = assemble_pulse(
-            signer = self.signer,
             chain_index = self.chain_index,
             local_random_value = self.local_random_value,
             next_local_random_value = next_local_random_value,
@@ -146,6 +145,7 @@ class PulseScheduler:
             self.current_pulse['timeStamp'].set(self.current_pulse['timeStamp'].get() + self.anticipation)
 
     def emit_pulse(self):
+        self.current_pulse = sign_pulse(self.signer, self.current_pulse)
         self.store.addPulse(self.current_pulse)
         print("Releasing pulse", pulse_to_json(self.current_pulse, sort_keys=True, indent=4))
         self.previous_pulse = self.current_pulse
@@ -191,6 +191,8 @@ class PulseScheduler:
         # use with calculating time deltas, but in this case I think it's the
         # best choice so that when the system syncs with a time server
         # the events are scheduled based on that update
+
+        # HOWEVER: if someone hacks the system clock, this opens up a hole...
         s = scheduler(time.time, time.sleep)
 
         while True:

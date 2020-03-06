@@ -98,60 +98,6 @@ def set_pulse_status(pulse, *statuses):
         code = code | s
     pulse['statusCode'].set(code)
 
-def init_pulse(hasher, chain_index, previous_pulse):
-    global EMPTY_HASH
-    # meta information
-    # Pulse index starts at zero
-    pulse_index = 0
-    last_time = datetime.now() - PERIOD
-    status_code = STATUS_NO_PRIOR_PRECOMMIT
-
-    if previous_pulse != None:
-        if previous_pulse['chainIndex'].get() != chain_index:
-            raise Error('Chain index provided does not match previous pulse!')
-
-        pulse_index = previous_pulse['pulseIndex'].get() + 1
-        last_time = previous_pulse['timeStamp'].get()
-        status_code = STATUS_OK
-
-    uri = get_pulse_uri(chain_index, pulse_index)
-    time_stamp = last_time + PERIOD
-
-    # random values
-    local_random_value = hasher.get_local_random_value()
-
-    pulse = pulse_from_dict({
-        'uri': uri,
-        'version': BEACON_VERSION,
-        'cypherSuite': CYPHER_SUITE,
-        'period': PERIOD,
-        'certificateId': hasher.get_certificate_id(),
-        'chainIndex': chain_index,
-        'pulseIndex': pulse_index,
-        'timeStamp': time_stamp,
-        'localRandomValue': local_random_value,
-        # TODO external sources
-        # ...
-        'skipListLayerSize': SKIP_LIST_LAYER_SIZE,
-        'skipListNumLayers': SKIP_LIST_NUM_LAYERS,
-        'skipListAnchors': [], # set later
-        'precommitmentValue': EMPTY_HASH, # set later
-        'statusCode': status_code,
-        'signatureValue': EMPTY_HASH, # set later
-        'outputValue': EMPTY_HASH # set later
-    })
-
-    return pulse
-
-def finalize_pulse(hasher, pulse, previous_pulse, next_pulse):
-    pulse['skipListAnchors'] = get_skip_list_anchors(previous_pulse)
-    pulse['precommitmentValue'] = ByteHash(hasher.hash(next_pulse['localRandomValue']))
-    # sign the hash of all
-    values_to_sign = get_pulse_values(pulse, 'signatureValue')
-    pulse['signatureValue'] = ByteHash(hasher.sign_values(values_to_sign))
-    pulse['outputValue'] = ByteHash(get_pulse_hash(hasher, pulse, 'outputValue'))
-    return pulse
-
 def get_pulse_output_value(pulse):
     """
     Get the pulse output value.
@@ -159,7 +105,7 @@ def get_pulse_output_value(pulse):
     """
     return ByteHash(get_pulse_hash(pulse, 'outputValue'))
 
-def assemble_pulse(signer, chain_index, local_random_value, next_local_random_value, previous_pulse):
+def assemble_pulse(chain_index, local_random_value, next_local_random_value, previous_pulse):
     """
     Fully assemble a pulse based on the previous pulse, provided random value,
     and the chain index.
@@ -170,6 +116,7 @@ def assemble_pulse(signer, chain_index, local_random_value, next_local_random_va
     pulse_index = 0
     last_time = datetime.now() - PERIOD
     status_code = STATUS_NO_PRIOR_PRECOMMIT
+    certId = EMPTY_HASH
 
     if previous_pulse != None:
         # otherwise this should be the start of a new chain
@@ -179,9 +126,9 @@ def assemble_pulse(signer, chain_index, local_random_value, next_local_random_va
         pulse_index = previous_pulse['pulseIndex'].get() + 1
         last_time = previous_pulse['timeStamp'].get()
         status_code = STATUS_OK
+        certId = previous_pulse['certificateId']
 
     time_stamp = last_time + PERIOD
-    certId = signer.get_certificate_id()
 
     pulse = pulse_from_dict({
         'uri': get_pulse_uri(chain_index, pulse_index),
@@ -204,14 +151,20 @@ def assemble_pulse(signer, chain_index, local_random_value, next_local_random_va
         'outputValue': EMPTY_HASH # set later
     })
 
-    if previous_pulse != None and previous_pulse['certificateId'].get() != certId:
+    return pulse
+
+def sign_pulse(signer, pulse):
+    prevCert = pulse['certificateId'].get()
+    certId = signer.get_certificate_id()
+    pulse['certificateId'].set(certId)
+
+    if prevCert != certId and prevCert != EMPTY_HASH:
         # different cert id, so set status
         set_pulse_status(pulse, STATUS_CERT_ID_CHANGE)
 
     values_to_sign = get_pulse_values(pulse, 'signatureValue')
     pulse['signatureValue'] = ByteHash(signer.sign_values(values_to_sign))
     pulse['outputValue'] = get_pulse_output_value(pulse)
-
     return pulse
 
 # helpful for preparing a pulse for transit, or encoding to json
