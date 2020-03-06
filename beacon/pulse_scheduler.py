@@ -62,7 +62,7 @@ class PulseScheduler:
         self.max_local_skew_ahead = max_local_skew_ahead
         self.max_local_skew_behind = max_local_skew_behind
 
-        self.randomness_sources = RandomnessSources()
+        self.randomness_sources = RandomnessSources(use_hsm)
         self.signer = Signer(use_hsm)
 
         self.store = BeaconStore()
@@ -119,7 +119,7 @@ class PulseScheduler:
 
         self.previous_pulse = self.store.fetchLatestPulse()
 
-        print('last pulse', pulse_to_json(self.previous_pulse, sort_keys=True, indent=4))
+        # print('last pulse', pulse_to_json(self.previous_pulse, sort_keys=True, indent=4))
 
         if self.previous_pulse == None:
             return
