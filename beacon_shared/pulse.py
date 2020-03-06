@@ -171,16 +171,16 @@ def assemble_pulse(signer, chain_index, local_random_value, next_local_random_va
     last_time = datetime.now() - PERIOD
     status_code = STATUS_NO_PRIOR_PRECOMMIT
 
-    if previous_pulse != None and previous_pulse['chainIndex'].get() == chain_index:
+    if previous_pulse != None:
+        # otherwise this should be the start of a new chain
+        if previous_pulse['chainIndex'].get() != chain_index:
+            raise ValueError("Chain index provided does not match previous pulse!")
+
         pulse_index = previous_pulse['pulseIndex'].get() + 1
         last_time = previous_pulse['timeStamp'].get()
         status_code = STATUS_OK
-        # otherwise this should be the start of a new chain
-    else:
-        raise ValueError("Chain index provided does not match previous pulse!")
 
     time_stamp = last_time + PERIOD
-
     certId = signer.get_certificate_id()
 
     pulse = pulse_from_dict({
@@ -242,10 +242,10 @@ def assert_next_in_chain(lastPulse, currentPulse):
         return
     if lastPulse['chainIndex'].get() != currentPulse['chainIndex'].get():
         if currentPulse['pulseIndex'].get() != 0:
-            raise PulseChainException('Received pulse has new chain index but is not first pulse')
+            raise PulseChainException('Current Pulse has new chain index but is not first pulse')
     else:
         if currentPulse['pulseIndex'].get() != lastPulse['pulseIndex'].get() + 1:
-            raise PulseChainException('Received pulse is not next in chain')
+            raise PulseChainException('Current Pulse is not next in chain')
 
-    if lastPulse['outputValue'].get() != currentPulse['skipListAnchors'].get()[0].get():
-        raise PulseChainException('Received pulse previous pulse value does not match current pulse "outputValue"')
+        if lastPulse['outputValue'].get() != currentPulse['skipListAnchors'].get()[0].get():
+            raise PulseChainException('Previous pulse value does not match current pulse "outputValue"')

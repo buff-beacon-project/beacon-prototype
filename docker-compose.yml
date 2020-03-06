@@ -23,15 +23,17 @@ services:
             # for development
             - ./beacon/:/app
             - ./beacon_shared:/beacon_shared
+            - ./db:/db
         environment:
             ZMQ_BROADCAST_PORT: 5050
             USE_HSM: 0
+            BEACON_DB_PATH: /db/beacon.db
         # ports:
         #     - "5050:5050"
         command: ["python3", "/app"]
         depends_on:
             - "yubihsm"
-            - "beacon-storage"
+            # - "beacon-storage"
         # command: ["sh"]
         # entrypoint: /bin/sh
         # stdin_open: true
@@ -60,7 +62,7 @@ services:
         image: "beacon-api"
         build: "./beacon_api"
         depends_on:
-            - "beacon-storage"
+            - "beacon"
         volumes:
             # for development
             - ./beacon_api/:/app

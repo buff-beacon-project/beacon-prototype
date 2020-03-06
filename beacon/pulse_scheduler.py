@@ -1,11 +1,13 @@
+import traceback
 import time
 from sched import scheduler
 from datetime import timedelta, datetime
 from randomness_sources import RandomnessSources
+from beacon_shared.types import ByteHash
 from beacon_shared.hashing import hash_many
 from beacon_shared.pulse import assemble_pulse, set_pulse_status, pulse_to_json
 from beacon_shared.store import BeaconStore
-from exceptions import LatePulseException
+from exceptions import BeaconException, LatePulseException
 from signer import Signer
 
 class PulseScheduler:
@@ -102,7 +104,7 @@ class PulseScheduler:
 
     def get_local_random_value(self):
         values = self.randomness_sources.fetch()
-        return hash_many(values)
+        return ByteHash(hash_many(values))
 
     def recall_state(self):
         self.chain_index = 0
@@ -110,14 +112,20 @@ class PulseScheduler:
         self.local_random_value = None
 
         self.previous_pulse = self.store.fetchLatestPulse()
-        self.chain_index = self.previous_pulse["chainIndex"].get()
+
+        print('last pulse', pulse_to_json(self.previous_pulse, sort_keys=True, indent=4))
 
         if self.previous_pulse == None:
             return
 
-        if not self.local_random_value:
+        self.chain_index = self.previous_pulse["chainIndex"].get()
+
+        if self.local_random_value == None:
             # TODO: need better handling of picking up where we left off
+            self.local_random_value = self.get_local_random_value()
             self.chain_index += 1
+            self.previous_pulse = None
+            print('new chain')
 
     def generate_pulse(self, next_local_random_value):
         self.current_pulse = assemble_pulse(
@@ -157,7 +165,7 @@ class PulseScheduler:
             started_at = self.timer()
             self.next_local_random_value = self.get_local_random_value()
             self.generate_pulse(self.next_local_random_value)
-            self.pulse_generation_time = self.timer() - started_at
+            self.pulse_generation_duration = timedelta(seconds=(self.timer() - started_at))
 
         def release():
             self.emit_pulse()
@@ -167,9 +175,10 @@ class PulseScheduler:
 
         while True:
             try:
+                print('Generating next pulse of chain {}'.format(self.chain_index), flush=True)
                 # Wait then generate the next pulse
                 wait_for = self.get_next_pulse_generation_delay().total_seconds()
-                s.enter(wait_for, generate)
+                s.enter(wait_for, 0, generate)
                 s.run(blocking = True)
 
                 # wait then release the generated pulse
@@ -178,16 +187,22 @@ class PulseScheduler:
                 if wait_for < 0:
                     set_pulse_status(pulse, STATUS_GAP)
                     release()
-                    print('Warning: pulse {} was late'.format(pulse["pulseIndex"].get()))
+                    print('Warning: pulse {} was late'.format(pulse["pulseIndex"].get()), flush=True)
                 else:
-                    s.enter(wait_for, release)
+                    s.enter(wait_for, 0, release)
                     s.run(blocking = True)
 
                 # record the status
-                eta = self.get_tuning_slack(self.pulse_generation_time)
-                alpha = self.get_time_accuracy(self.pulse_generation_time)
-                print("Last pulse generated with \ntuning slack: {}s\ntime accuracy: {}s".format(eta, alpha))
+                eta = self.get_tuning_slack(self.pulse_generation_duration)
+                alpha = self.get_time_accuracy(self.pulse_generation_duration)
+                print("Last pulse generated with \ngeneration duration: {}\ntuning slack: {}s\ntime accuracy: {}s".format(self.pulse_generation_duration, eta, alpha), flush=True)
 
             # TODO handle exceptions
+            except BeaconException as e:
+                print('ERROR:', e)
+                traceback.print_exc()
+
             except Exception as e:
-                print(e)
+                print('UNRECOVERABLE ERROR:', e)
+                traceback.print_exc()
+                exit(1)

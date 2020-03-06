@@ -1,3 +1,4 @@
+from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from beacon_shared.serialization import serialize_field_value
 

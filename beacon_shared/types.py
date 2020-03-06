@@ -16,6 +16,10 @@ class BeaconType(ABC):
     Default set method
     """
     def set(self, value):
+        if isinstance(value, type(self)):
+            self.value = value.get()
+            return
+
         self.value = value
 
     """
@@ -45,7 +49,12 @@ Type representing a 32 bit integer
 """
 class UInt32(BeaconType):
     def set(self, value):
+        if isinstance(value, type(self)):
+            self.value = value.get()
+            return
+
         self.value = int(value)
+
     def serialize(self):
         return encode_uint32(self.value)
 
@@ -54,7 +63,12 @@ Type representing a 64 bit integer
 """
 class UInt64(BeaconType):
     def set(self, value):
+        if isinstance(value, type(self)):
+            self.value = value.get()
+            return
+
         self.value = int(value)
+
     def serialize(self):
         return encode_uint64(self.value)
 
@@ -95,6 +109,9 @@ Type representing a duration (eg: period)
 """
 class Duration(BeaconType):
     def set(self, value):
+        if isinstance(value, type(self)):
+            self.value = value.get()
+            return
         if isinstance(value, timedelta):
             self.value = value
             return
@@ -114,6 +131,9 @@ Type representing a bytehash (eg: signature, randOut, ...)
 """
 class ByteHash(BeaconType):
     def set(self, value):
+        if isinstance(value, type(self)):
+            self.value = value.get()
+            return
         if isinstance(value, str):
             value = bytes.fromhex(value)
 
@@ -133,6 +153,9 @@ Type representing a list of skiplist anchors
 """
 class SkipAnchors(BeaconType):
     def set(self, value):
+        if isinstance(value, type(self)):
+            self.value = value.get()
+            return
         if type(value) is not list:
             raise TypeError('Can not set beacon SkipAnchors type from value provided. Must be a list of ByteHash types')
 
