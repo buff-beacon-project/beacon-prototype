@@ -1,5 +1,6 @@
 import traceback
 import time
+import signal
 from sched import scheduler
 from datetime import timedelta, datetime
 from randomness_sources import RandomnessSources
@@ -9,6 +10,13 @@ from beacon_shared.pulse import assemble_pulse, set_pulse_status, pulse_to_json
 from beacon_shared.store import BeaconStore
 from exceptions import BeaconException, LatePulseException
 from signer import Signer
+
+class ProgramKilled(Exception):
+    pass
+
+def clear_schedule_queue(s):
+    for e in s.queue:
+        s.cancel(e)
 
 class PulseScheduler:
     """
@@ -54,8 +62,6 @@ class PulseScheduler:
         self.max_local_skew_ahead = max_local_skew_ahead
         self.max_local_skew_behind = max_local_skew_behind
 
-        self.timer = time.perf_counter
-
         self.randomness_sources = RandomnessSources()
         self.signer = Signer(use_hsm)
 
@@ -77,7 +83,7 @@ class PulseScheduler:
         """
         return self.delay + self.anticipation - self.max_local_skew_ahead
 
-    def get_tuning_slack(self, pulse_generation_time):
+    def get_tuning_slack(self, pulse_generation_time = None):
         """
         calculation of tuning slack $\eta$ based on Appendix A.1
         """
@@ -91,7 +97,7 @@ class PulseScheduler:
 
         return eta
 
-    def get_time_accuracy(self, pulse_generation_time):
+    def get_time_accuracy(self, pulse_generation_time = None):
         """
         calculation of time accuracy $\alpha$ based on Appendix A.1
         """
@@ -135,6 +141,9 @@ class PulseScheduler:
             next_local_random_value = next_local_random_value,
             previous_pulse = self.previous_pulse
         )
+        # first pulse... so modify the timestamp to give enough time to calculate
+        if self.current_pulse['pulseIndex'].get() == 0:
+            self.current_pulse['timeStamp'].set(self.current_pulse['timeStamp'].get() + self.anticipation)
 
     def emit_pulse(self):
         self.store.addPulse(self.current_pulse)
@@ -162,16 +171,27 @@ class PulseScheduler:
         self.next_local_random_value = None
 
         def generate():
-            started_at = self.timer()
+            self.pulse_generation_started_at = self.now()
+            started_at = time.perf_counter()
             self.next_local_random_value = self.get_local_random_value()
             self.generate_pulse(self.next_local_random_value)
-            self.pulse_generation_duration = timedelta(seconds=(self.timer() - started_at))
+            self.pulse_generation_duration = timedelta(seconds=(time.perf_counter() - started_at))
 
         def release():
             self.emit_pulse()
             self.local_random_value = self.next_local_random_value
 
-        s = scheduler(self.timer, time.sleep)
+        def exit_handler():
+            raise ProgramKilled
+
+        signal.signal(signal.SIGTERM, exit_handler)
+        signal.signal(signal.SIGINT, exit_handler)
+
+        # time.time is the system clock. Normally this is not preferred for
+        # use with calculating time deltas, but in this case I think it's the
+        # best choice so that when the system syncs with a time server
+        # the events are scheduled based on that update
+        s = scheduler(time.time, time.sleep)
 
         while True:
             try:
@@ -193,16 +213,36 @@ class PulseScheduler:
                     s.run(blocking = True)
 
                 # record the status
+                idealCalculationTime = pulse['timeStamp'].get() - self.anticipation
+                calculationStartDelay = self.pulse_generation_started_at - idealCalculationTime
                 eta = self.get_tuning_slack(self.pulse_generation_duration)
+                etaMax = self.get_tuning_slack()
                 alpha = self.get_time_accuracy(self.pulse_generation_duration)
-                print("Last pulse generated with \ngeneration duration: {}\ntuning slack: {}s\ntime accuracy: {}s".format(self.pulse_generation_duration, eta, alpha), flush=True)
+                alphaMax = self.get_time_accuracy()
+                print("STATUS\n--------")
+                print("calculation started at: {} (dt from ideal: {}s)".format(
+                    self.pulse_generation_started_at,
+                    calculationStartDelay.total_seconds()
+                ))
+                print("generation duration: {}s\ntuning slack: {}s ({}s maximum)\ntime accuracy: {}s ({}s maximum)".format(
+                    self.pulse_generation_duration.total_seconds(),
+                    eta.total_seconds(),
+                    etaMax.total_seconds(),
+                    alpha.total_seconds(),
+                    alphaMax.total_seconds()
+                ), flush=True)
 
             # TODO handle exceptions
             except BeaconException as e:
                 print('ERROR:', e)
                 traceback.print_exc()
 
+            except ProgramKilled as e:
+                clear_schedule_queue(s)
+                exit(0)
+
             except Exception as e:
                 print('UNRECOVERABLE ERROR:', e)
                 traceback.print_exc()
+                clear_schedule_queue(s)
                 exit(1)
