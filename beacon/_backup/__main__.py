@@ -7,7 +7,6 @@ from threading import Timer
 from beacon_shared.config import MAX_TIMEDELTA
 from exceptions import LatePulseException, PulseTimeException
 import beacon_shared.pulse as pulse
-from beacon_shared.types import UInt64
 
 def get_zmq_socket(port):
     context = zmq.Context()

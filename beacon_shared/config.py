@@ -1,9 +1,14 @@
-import datetime
+from datetime import timedelta
 
 BEACON_VERSION='1.0'
 CYPHER_SUITE=0 # '0: SHA512 hashing and RSA signatures with PKCSv1.5 padding'
-PERIOD=datetime.timedelta(seconds=10)
-# The maximum time the pulse can be late
-MAX_TIMEDELTA=datetime.timedelta(seconds=1)
 SKIP_LIST_LAYER_SIZE=27
 SKIP_LIST_NUM_LAYERS=5
+
+TIMINGS={
+    "period": timedelta(seconds=10),
+    "anticipation": timedelta(seconds=2),
+    "delay": timedelta(seconds=6),
+    "max_local_skew_behind": timedelta(seconds=6),
+    "max_local_skew_ahead": timedelta(seconds=6)
+}

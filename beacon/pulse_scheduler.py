@@ -3,7 +3,8 @@ from sched import scheduler
 from datetime import timedelta, datetime
 from randomness_sources import RandomnessSources
 from beacon_shared.hashing import hash_many
-from beacon_shared.pulse import assemble_pulse
+from beacon_shared.pulse import assemble_pulse, set_pulse_status, pulse_to_json
+from beacon_shared.store import BeaconStore
 from exceptions import LatePulseException
 from signer import Signer
 
@@ -15,13 +16,13 @@ class PulseScheduler:
     ---------
     period - The ideal period of pulses (corresponds to $\pi$)
     anticipation - The time before pulse timestamp to start assembling the pulse (corresponds to $\Delta$)
-    max_delay - The maximum allowed delay for emission after the pulse timestamp (corresponds to $\delta$)
+    delay - The delay for emission after the pulse timestamp (corresponds to $\delta$)
     max_local_skew_ahead - The max allowed local clock skew ahead of UTC (corresponds to $\sigma^+$)
     max_local_skew_behind - The max allowed local clock skew behind UTC (corresponds to $\sigma^-$)
     """
-    def __init__(self, period, anticipation, max_delay, max_local_skew_behind, max_local_skew_ahead, use_hsm = True):
+    def __init__(self, period, anticipation, delay, max_local_skew_behind, max_local_skew_ahead, use_hsm = True):
 
-        for arg in [period, anticipation, max_delay, max_local_skew_ahead, max_local_skew_behind]:
+        for arg in [period, anticipation, delay, max_local_skew_ahead, max_local_skew_behind]:
             if not isinstance(arg, timedelta):
                 raise ValueError("Provided argument is not a timedelta")
 
@@ -34,11 +35,11 @@ class PulseScheduler:
             raise ValueError("The maximum clock skew provided is too large for the period")
 
         # R2
-        if max_delay < max_local_skew_behind:
+        if delay < max_local_skew_behind:
             raise ValueError("The maximum delay provided is too large for provided clock skew")
 
         # R3 (partial)
-        if max_delay >= period / 4 - max_local_skew_ahead:
+        if delay >= period / 4 - max_local_skew_ahead:
             raise ValueError("The maximum delay provided is too large and would result in a late pulse")
 
         # R4
@@ -47,20 +48,32 @@ class PulseScheduler:
 
         self.period = period
         self.anticipation = anticipation
-        self.max_delay = max_delay
+        self.delay = delay
         self.max_local_skew_ahead = max_local_skew_ahead
         self.max_local_skew_behind = max_local_skew_behind
 
-        self.now = time.perf_counter
+        self.timer = time.perf_counter
+
         self.randomness_sources = RandomnessSources()
         self.signer = Signer(use_hsm)
+
+        self.store = BeaconStore()
+        self.store.initDB()
+        # TODO: this should be changed
+        self.store.addCertificate(
+            self.signer.get_certificate_id().hex(),
+            self.signer.get_certificate().hex()
+        )
+
+    def now(self):
+        return datetime.now()
 
     @property
     def max_pulse_generation_time(self):
         """
         corresponds to $\gamma$
         """
-        return self.max_delay + self.anticipation - self.max_local_skew_ahead
+        return self.delay + self.anticipation - self.max_local_skew_ahead
 
     def get_tuning_slack(self, pulse_generation_time):
         """
@@ -70,7 +83,7 @@ class PulseScheduler:
         # R5
         eta = max(self.max_local_skew_ahead, self.max_local_skew_behind)
         # R6
-        eta = max(eta, self.max_delay - self.max_local_skew_behind)
+        eta = max(eta, self.delay - self.max_local_skew_behind)
         # R7
         eta = max(eta, self.anticipation - pulse_generation_time - self.max_local_skew_ahead)
 
@@ -81,7 +94,7 @@ class PulseScheduler:
         calculation of time accuracy $\alpha$ based on Appendix A.1
         """
         pulse_generation_time = self.max_pulse_generation_time if pulse_generation_time == None else pulse_generation_time
-        delta_prime = max(self.max_delay, pulse_generation_time - self.anticipation)
+        delta_prime = max(self.delay, pulse_generation_time - self.anticipation)
         return max(
             self.anticipation - pulse_generation_time - self.max_local_skew_behind,
             delta_prime + self.max_local_skew_ahead
@@ -92,10 +105,19 @@ class PulseScheduler:
         return hash_many(values)
 
     def recall_state(self):
-        # TODO implement memory
         self.chain_index = 0
         self.previous_pulse = None
         self.local_random_value = None
+
+        self.previous_pulse = self.store.fetchLatestPulse()
+        self.chain_index = self.previous_pulse["chainIndex"].get()
+
+        if self.previous_pulse == None:
+            return
+
+        if not self.local_random_value:
+            # TODO: need better handling of picking up where we left off
+            self.chain_index += 1
 
     def generate_pulse(self, next_local_random_value):
         self.current_pulse = assemble_pulse(
@@ -107,7 +129,8 @@ class PulseScheduler:
         )
 
     def emit_pulse(self):
-        pulse = self.current_pulse
+        self.store.addPulse(self.current_pulse)
+        print("Releasing pulse", pulse_to_json(self.current_pulse, sort_keys=True, indent=4))
         self.previous_pulse = self.current_pulse
         self.current_pulse = None
 
@@ -116,7 +139,10 @@ class PulseScheduler:
             return timedelta(seconds=0)
 
         next_pulse_time = self.previous_pulse["timeStamp"].get() + self.period
-        return next_pulse_time - self.anticipation
+        return next_pulse_time - self.anticipation - self.now()
+
+    def get_pulse_release_delay(self, pulse):
+        return pulse["timeStamp"].get() + self.delay - self.now()
 
     def start(self):
         self.chain_index = 0
@@ -125,25 +151,42 @@ class PulseScheduler:
         self.local_random_value = None
         self.recall_state()
 
-        def callback():
-            started_at = self.now()
-            next_local_random_value = self.get_local_random_value()
-            self.generate_pulse()
-            generation_time = self.now() - started_at
-            if generation_time > self.max_pulse_generation_time:
-                raise LatePulseException()
-            self.emit_pulse()
-            self.local_random_value = next_local_random_value
+        self.next_local_random_value = None
 
-        s = scheduler(self.now, time.sleep)
+        def generate():
+            started_at = self.timer()
+            self.next_local_random_value = self.get_local_random_value()
+            self.generate_pulse(self.next_local_random_value)
+            self.pulse_generation_time = self.timer() - started_at
+
+        def release():
+            self.emit_pulse()
+            self.local_random_value = self.next_local_random_value
+
+        s = scheduler(self.timer, time.sleep)
 
         while True:
             try:
-                delay = self.get_next_pulse_generation_delay().total_seconds()
-                if delay < 0:
-                    raise LatePulseException()
-                s.enter(delay, callback)
+                # Wait then generate the next pulse
+                wait_for = self.get_next_pulse_generation_delay().total_seconds()
+                s.enter(wait_for, generate)
                 s.run(blocking = True)
+
+                # wait then release the generated pulse
+                pulse = self.current_pulse
+                wait_for = self.get_pulse_release_delay(pulse).total_seconds()
+                if wait_for < 0:
+                    set_pulse_status(pulse, STATUS_GAP)
+                    release()
+                    print('Warning: pulse {} was late'.format(pulse["pulseIndex"].get()))
+                else:
+                    s.enter(wait_for, release)
+                    s.run(blocking = True)
+
+                # record the status
+                eta = self.get_tuning_slack(self.pulse_generation_time)
+                alpha = self.get_time_accuracy(self.pulse_generation_time)
+                print("Last pulse generated with \ntuning slack: {}s\ntime accuracy: {}s".format(eta, alpha))
 
             # TODO handle exceptions
             except Exception as e:

@@ -7,21 +7,21 @@ services:
     yubihsm:
         image: "yubihsm"
         build:
-            context: "./source_hasher"
+            context: "./beacon"
             dockerfile: "./Dockerfile.yubihsm"
         privileged: true
         devices:
             - "/dev:/dev"
 
     # Starts the curator to hash random numbers
-    source-hasher:
-        image: "source-hasher"
+    beacon:
+        image: "beacon"
         build:
-            context: "./source_hasher"
+            context: "./beacon"
             dockerfile: "../Dockerfile"
         volumes:
             # for development
-            - ./source_hasher/:/app
+            - ./beacon/:/app
             - ./beacon_shared:/beacon_shared
         environment:
             ZMQ_BROADCAST_PORT: 5050
@@ -38,23 +38,23 @@ services:
         # tty: true
         # restart: "always"
 
-    beacon-storage:
-        image: "beacon-storage"
-        build:
-            context: "./beacon_storage"
-            dockerfile: "../Dockerfile"
-        volumes:
-            # for development
-            - ./beacon_storage/:/app
-            - ./beacon_shared:/beacon_shared
-            - ./db:/db
-        environment:
-            ZMQ_LISTEN_PORT: 5050
-            BEACON_DB_PATH: /db/beacon.db
-        # ports:
-        #     - "5050:5050"
-        tty: true
-        command: ["python3", "/app"]
+    # beacon-storage:
+    #     image: "beacon-storage"
+    #     build:
+    #         context: "./beacon_storage"
+    #         dockerfile: "../Dockerfile"
+    #     volumes:
+    #         # for development
+    #         - ./beacon_storage/:/app
+    #         - ./beacon_shared:/beacon_shared
+    #         - ./db:/db
+    #     environment:
+    #         ZMQ_LISTEN_PORT: 5050
+    #         BEACON_DB_PATH: /db/beacon.db
+    #     # ports:
+    #     #     - "5050:5050"
+    #     tty: true
+    #     command: ["python3", "/app"]
 
     beacon-api:
         image: "beacon-api"

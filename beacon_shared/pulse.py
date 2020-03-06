@@ -3,9 +3,11 @@ from datetime import datetime
 from collections import OrderedDict
 from .status_codes import *
 from .types import *
-from .config import BEACON_VERSION, CYPHER_SUITE, PERIOD, SKIP_LIST_LAYER_SIZE, SKIP_LIST_NUM_LAYERS
+from .config import BEACON_VERSION, CYPHER_SUITE, TIMINGS, SKIP_LIST_LAYER_SIZE, SKIP_LIST_NUM_LAYERS
 from .skiplist import getHighestLayerPower
 from .hashing import hash, hash_many
+
+PERIOD = TIMINGS["period"]
 
 EMPTY_HASH = '0'*128
 PULSE_KEYS = [
@@ -90,13 +92,19 @@ def get_skip_list_anchors(previous_pulse):
     hashes += (previous_pulse['skipListAnchors'].get())[n:]
     return SkipAnchors(hashes)
 
+def set_pulse_status(pulse, *statuses):
+    code = pulse['statusCode'].get()
+    for s in statuses:
+        code = code | s
+    pulse['statusCode'].set(code)
+
 def init_pulse(hasher, chain_index, previous_pulse):
     global EMPTY_HASH
     # meta information
     # Pulse index starts at zero
     pulse_index = 0
-    last_time = datetime.today() - PERIOD
-    status_code = STATUS_FIRST_PULSE
+    last_time = datetime.now() - PERIOD
+    status_code = STATUS_NO_PRIOR_PRECOMMIT
 
     if previous_pulse != None:
         if previous_pulse['chainIndex'].get() != chain_index:
@@ -160,23 +168,27 @@ def assemble_pulse(signer, chain_index, local_random_value, next_local_random_va
     # meta information
     # Pulse index starts at zero
     pulse_index = 0
-    last_time = datetime.today() - PERIOD
-    status_code = STATUS_FIRST_PULSE
+    last_time = datetime.now() - PERIOD
+    status_code = STATUS_NO_PRIOR_PRECOMMIT
 
     if previous_pulse != None and previous_pulse['chainIndex'].get() == chain_index:
         pulse_index = previous_pulse['pulseIndex'].get() + 1
         last_time = previous_pulse['timeStamp'].get()
         status_code = STATUS_OK
         # otherwise this should be the start of a new chain
+    else:
+        raise ValueError("Chain index provided does not match previous pulse!")
 
     time_stamp = last_time + PERIOD
+
+    certId = signer.get_certificate_id()
 
     pulse = pulse_from_dict({
         'uri': get_pulse_uri(chain_index, pulse_index),
         'version': BEACON_VERSION,
         'cypherSuite': CYPHER_SUITE,
         'period': PERIOD,
-        'certificateId': signer.get_certificate_id(),
+        'certificateId': certId,
         'chainIndex': chain_index,
         'pulseIndex': pulse_index,
         'timeStamp': time_stamp,
@@ -191,6 +203,10 @@ def assemble_pulse(signer, chain_index, local_random_value, next_local_random_va
         'signatureValue': EMPTY_HASH, # set later
         'outputValue': EMPTY_HASH # set later
     })
+
+    if previous_pulse != None and previous_pulse['certificateId'].get() != certId:
+        # different cert id, so set status
+        set_pulse_status(pulse, STATUS_CERT_ID_CHANGE)
 
     values_to_sign = get_pulse_values(pulse, 'signatureValue')
     pulse['signatureValue'] = ByteHash(signer.sign_values(values_to_sign))
