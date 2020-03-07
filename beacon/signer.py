@@ -23,11 +23,13 @@ class Signer:
         self.signing_hash_strategy = hashes.SHA512()
 
         self.generate_private_key()
+        self.store_certificate()
+
         if self.use_hsm:
             self.init_hsm()
 
         self.store_public_key()
-        self.store_certificate()
+
 
     def generate_private_key(self):
         self.private_key = rsa.generate_private_key(public_exponent=0x10001, key_size=2048, backend=default_backend())
@@ -42,13 +44,17 @@ class Signer:
         self.public_key = self.hsm_asym_key.get_public_key() if self.use_hsm else self.private_key.public_key()
 
     def get_certificate_id(self):
+        if self.use_hsm:
+            return self.hsm_key_cert_id
         return self.certificate_id
 
     def get_certificate(self):
-        return self.certificate
+        if self.use_hsm:
+            return self.hsm_key_cert_bytes
+        return self.certificate_bytes
 
     def store_certificate(self):
-        key = self.hsm_asym_key if self.use_hsm else self.private_key
+        key = self.private_key
         """
         Ref: line 1582
 
@@ -74,7 +80,7 @@ class Signer:
         ).issuer_name(
             issuer
         ).public_key(
-            self.get_public_key()
+            key.public_key()
         ).serial_number(
             x509.random_serial_number()
         ).not_valid_before(
@@ -87,8 +93,9 @@ class Signer:
             critical=False,
         ).sign(key, self.signing_hash_strategy, default_backend())
 
-        self.certificate = cert.public_bytes(serialization.Encoding.PEM)
-        self.certificate_id = hash(ByteHash(self.certificate))
+        self.certificate = cert
+        self.certificate_bytes = cert.public_bytes(serialization.Encoding.PEM)
+        self.certificate_id = hash(ByteHash(self.certificate_bytes))
 
     # TODO: make this better
     # ref: https://thekernel.com/wp-content/uploads/2018/11/YubiHSM2-EN.pdf
@@ -101,8 +108,56 @@ class Signer:
         # Create an authenticated session with the HSM
         self.hsm_session = hsm.create_session_derived(1, 'password')
 
-        #asymkey = AsymmetricKey.generate(session, 0, 'Generate BP R1 Sign', 0xffff, CAPABILITY.SIGN_ECDSA, ALGORITHM.EC_BP256)
-        self.hsm_asym_key = AsymmetricKey.put(self.hsm_session, 0, 'RSA pkcs1v15', 0xffff, CAPABILITY.SIGN_PKCS, self.private_key)
+        self.hsm_asym_key = None
+        self.hsm_asym_key_self = None
+
+        # print([ x.get_info() for x in self.hsm_session.list_objects() ])
+
+        objs = self.hsm_session.list_objects(object_id=2)
+        if len(objs) > 0:
+            key = objs[0]
+            if key.get_info().label == 'Beacon Generated RSA pkcs1v15':
+                self.hsm_asym_key_self = key
+            else:
+                for key in objs:
+                    key.delete()
+
+        if not self.hsm_asym_key_self:
+            self.hsm_asym_key_self = AsymmetricKey.put(
+                self.hsm_session, 2,
+                'Beacon Generated RSA pkcs1v15',
+                0xffff,
+                CAPABILITY.SIGN_ATTESTATION_CERTIFICATE,
+                self.private_key
+            )
+            self.hsm_asym_key_self.put_certificate(
+                'Beacon signing certificate',
+                0xffff,
+                CAPABILITY.SIGN_PKCS,
+                self.certificate
+            )
+
+        objs = self.hsm_session.list_objects(object_id=3)
+        if len(objs) > 0:
+            key = objs[0]
+            if key.get_info().label == 'HSM Generated RSA pkcs1v15':
+                self.hsm_asym_key = objs[0]
+            else:
+                for key in objs:
+                    key.delete()
+
+        if not self.hsm_asym_key:
+            self.hsm_asym_key = AsymmetricKey.generate(
+                self.hsm_session, 3,
+                'HSM Generated RSA pkcs1v15',
+                0xffff,
+                CAPABILITY.SIGN_PKCS,
+                ALGORITHM.RSA_2048
+            )
+
+        self.hsm_key_cert = self.hsm_asym_key.attest(2)
+        self.hsm_key_cert_bytes = self.hsm_key_cert.public_bytes(serialization.Encoding.PEM)
+        self.hsm_key_cert_id = hash(ByteHash(self.hsm_key_cert_bytes))
 
     def sign_values_hsm(self, values):
         # Line 579-583  The hashing is not repeated inside the illustrated Signing module

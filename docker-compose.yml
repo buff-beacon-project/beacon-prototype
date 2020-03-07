@@ -26,7 +26,7 @@ services:
             - ./db:/db
         environment:
             ZMQ_BROADCAST_PORT: 5050
-            USE_HSM: 0
+            USE_HSM: 1
             BEACON_DB_PATH: /db/beacon.db
         # ports:
         #     - "5050:5050"

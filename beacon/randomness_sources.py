@@ -3,6 +3,11 @@ from beacon_shared.types import ByteHash
 from simple_rsa_rng import SimpleRSARNG
 from yubihsm import YubiHsm
 
+def to_byte_hash(n):
+    if type(n) is not bytes:
+        n = n.to_bytes(512, byteorder='big', signed=False)
+    return ByteHash(n)
+
 class RandomnessSources:
     def __init__(self, use_hsm = True):
         self.simpleRSA = SimpleRSARNG(2048, 3)
@@ -27,6 +32,6 @@ class RandomnessSources:
 
         # convert to ByteHash
         return map(
-            lambda z: ByteHash(z.to_bytes(512, byteorder='big', signed=False)),
+            to_byte_hash,
             values
         )

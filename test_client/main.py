@@ -1,3 +1,4 @@
+import sys
 import urllib.request, json
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
@@ -8,6 +9,8 @@ from cryptography import x509
 from beacon_shared.pulse import pulse_from_dict, get_pulse_values, pulse_to_plain_dict
 import pprint
 
+ADDR=(sys.argv[1] if len(sys.argv) else 'localhost')
+
 def fetch(url):
     with urllib.request.urlopen(url) as http:
         return http.read().decode()
@@ -16,7 +19,7 @@ def fetch_json(url):
     return json.loads(fetch(url))
 
 def fetchLastPulse():
-    dict = fetch_json('http://localhost:8080/pulse/last')
+    dict = fetch_json('http://{}:8080/pulse/last'.format(ADDR))
     return pulse_from_dict(dict)
 
 
@@ -26,7 +29,7 @@ def fetchCertificate(hashid):
     global certCache
     if hashid in certCache:
         return certCache[hashid]
-    data = fetch('http://localhost:8080/certificate/{}'.format(hashid))
+    data = fetch('http://{}:8080/certificate/{}'.format(ADDR, hashid))
     cert = x509.load_pem_x509_certificate(data.encode('utf-8'), default_backend())
     certCache[hashid] = cert
     return cert
@@ -50,7 +53,7 @@ def validatePulse(pulse, cert = None):
     )
 
 def validateSkiplist(src, dest):
-    skiplist = fetch_json('http://localhost:8080/chain/0/skiplist/{}/{}'.format(src, dest))
+    skiplist = fetch_json('http://{}:8080/chain/0/skiplist/{}/{}'.format(ADDR, src, dest))
     prev = None
 
     for dict in skiplist:
