@@ -5,6 +5,7 @@ from sched import scheduler
 from datetime import timedelta, datetime
 from randomness_sources import RandomnessSources
 from beacon_shared.types import ByteHash
+from beacon_shared.status_codes import STATUS_GAP
 from beacon_shared.hashing import hash_many
 from beacon_shared.pulse import assemble_pulse, sign_pulse, set_pulse_status, pulse_to_json
 from beacon_shared.store import BeaconStore
@@ -190,13 +191,11 @@ class PulseScheduler:
         signal.signal(signal.SIGTERM, exit_handler)
         signal.signal(signal.SIGINT, exit_handler)
 
-        # time.time is the system clock. Normally this is not preferred for
-        # use with calculating time deltas, but in this case I think it's the
-        # best choice so that when the system syncs with a time server
-        # the events are scheduled based on that update
-
-        # HOWEVER: if someone hacks the system clock, this opens up a hole...
-        s = scheduler(time.time, time.sleep)
+        # time.time is the system clock. if someone hacks the system clock, this opens up a hole...
+        # so we use the perf_counter which doesn't keep track of ntp updates
+        # since this only is used to track sleep time and time.time is used schedule pulses it works.
+        # TODO: but i think we need to figure out a way to close that hole if someone modifies the system clock.
+        s = scheduler(time.perf_counter, time.sleep)
 
         while True:
             try:
@@ -205,6 +204,10 @@ class PulseScheduler:
                 wait_for = self.get_next_pulse_generation_delay().total_seconds()
                 s.enter(wait_for, 0, generate)
                 s.run(blocking = True)
+
+                # testing late pulse behaviour
+                # if int.from_bytes(pulse['localRandomValue'].get(), byteorder="big") % 5 == 0:
+                #     time.sleep(3)
 
                 # wait then release the generated pulse
                 pulse = self.current_pulse

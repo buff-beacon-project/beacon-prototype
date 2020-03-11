@@ -1,3 +1,7 @@
 TODO
 
 implement 8.3.1 recommendation taking randOut to be XOR or rho and randLocal
+
+QUESTIONS
+
+What happens when a skiplist anchor pulse is invalid?

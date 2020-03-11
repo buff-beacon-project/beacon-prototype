@@ -7,6 +7,7 @@ from cryptography.hazmat.primitives.asymmetric import padding, utils
 from cryptography.exceptions import InvalidSignature
 from cryptography import x509
 from beacon_shared.pulse import pulse_from_dict, get_pulse_values, pulse_to_plain_dict
+from beacon_shared.hashing import hash_many
 import pprint
 
 ADDR=(sys.argv[1] if len(sys.argv) else 'localhost')
@@ -39,10 +40,7 @@ def validatePulse(pulse, cert = None):
         cert = fetchCertificate(pulse['certificateId'].get_json_value())
 
     signed_values = get_pulse_values(pulse, 'signatureValue')
-    hasher = hashes.Hash(hashes.SHA512(), default_backend())
-    for value in signed_values:
-        hasher.update(value.serialize())
-    digest = hasher.finalize()
+    digest = hash_many(signed_values)
 
     # If the signature does not match, verify() will raise an InvalidSignature exception.
     return cert.public_key().verify(
@@ -90,7 +88,7 @@ if __name__ == '__main__':
 
 
     srcid = 2
-    print('\n\n*** Validating skiplist from lastpulse to pulse {} ***'.format(srcid))
+    print('\n\n*** Validating skiplist from last pulse ({}) to pulse {} ***'.format(pulse['pulseIndex'].get(), srcid))
     try:
         validateSkiplist(srcid, pulse['pulseIndex'].get())
         print('>>> Valid skiplist <<<')
