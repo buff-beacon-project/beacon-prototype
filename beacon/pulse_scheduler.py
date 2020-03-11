@@ -145,7 +145,6 @@ class PulseScheduler:
             self.current_pulse['timeStamp'].set(self.current_pulse['timeStamp'].get() + self.anticipation)
 
     def emit_pulse(self):
-        self.current_pulse = sign_pulse(self.signer, self.current_pulse)
         self.store.addPulse(self.current_pulse)
         print("Releasing pulse", pulse_to_json(self.current_pulse, sort_keys=True, indent=4))
         self.previous_pulse = self.current_pulse
@@ -170,11 +169,15 @@ class PulseScheduler:
 
         self.next_local_random_value = None
 
+        def finalize():
+            self.current_pulse = sign_pulse(self.signer, self.current_pulse)
+
         def generate():
             self.pulse_generation_started_at = self.now()
             started_at = time.perf_counter()
             self.next_local_random_value = self.get_local_random_value()
             self.generate_pulse(self.next_local_random_value)
+            finalize()
             self.pulse_generation_duration = timedelta(seconds=(time.perf_counter() - started_at))
 
         def release():
@@ -207,7 +210,9 @@ class PulseScheduler:
                 pulse = self.current_pulse
                 wait_for = self.get_pulse_release_delay(pulse).total_seconds()
                 if wait_for < 0:
+                    # if it's late, then set the status flag and resign
                     set_pulse_status(pulse, STATUS_GAP)
+                    finalize()
                     release()
                     print('Warning: pulse {} was late'.format(pulse["pulseIndex"].get()), flush=True)
                 else:

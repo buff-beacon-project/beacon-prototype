@@ -42,7 +42,13 @@ $ bash ./dev-setup-os-x.sh
 **OR** you can follow the instructions here: http://gw.tnode.com/docker/docker-machine-with-usb-support-on-windows-macos/
 ... with a slight modification: use command `$ vboxmanage modifyvm <vmname> --usbohci on`
 
-In order to run docker, you will need to run the following every time you enter
+You will need to ensure that the machine is running before starting the docker containers:
+
+```
+$ docker-machine start beacon-server
+```
+
+And in order to run docker, you will need to run the following every time you enter
 a new console session:
 
 ```
