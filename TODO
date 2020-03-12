@@ -1,6 +1,11 @@
 TODO
 
-implement 8.3.1 recommendation taking randOut to be XOR or rho and randLocal
+1. implement 8.3.1 recommendation taking randOut to be XOR or rho and randLocal
+2. figure out NTP/GPS clock sync
+3. try to solidify against system clock skew attacks
+4. induce a signature request rate limit and/or partition signing into another container
+5. Sign the randLocal as described in 8.3.2?
+6. Plan for db mirrors for external verification
 
 QUESTIONS
 
