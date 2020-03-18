@@ -122,7 +122,10 @@ class BeaconStore:
             c.execute(query.format(
                 tableName = BEACON_DB_CERT_TABLE
             ), (id,))
-            (id, cert) = c.fetchone()
+            result = c.fetchone()
+            if not result:
+                return None
+            (id, cert) = result
             return bytes.fromhex(cert)
         except Exception as e:
             raise e
@@ -200,12 +203,18 @@ class BeaconStore:
                 seq=','.join(['?'] * len(pulseIds))
             ), (chain,) + tuple(pulseIds))
             rows = c.fetchall()
+            if len(rows) is not len(pulseIds):
+                raise Exception("Could not retrieve all pulses")
             return [from_row(row) for row in rows]
         except Exception as e:
             raise e
         finally:
             if c:
                 c.close()
+
+    def fetchPulseByExactTime(self, dt):
+        datestr = dt.isoformat()
+        return self.queryOnePulse(where='WHERE timeStamp = ?', params=(datestr,))
 
     def fetchPulseByGeaterEqualTime(self, dt):
         datestr = dt.isoformat()

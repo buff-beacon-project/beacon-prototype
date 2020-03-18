@@ -10,7 +10,7 @@ from beacon_shared.pulse import pulse_from_dict, get_pulse_values, pulse_to_plai
 from beacon_shared.hashing import hash_many
 import pprint
 
-ADDR=(sys.argv[1] if len(sys.argv) else 'localhost')
+ADDR=(sys.argv[1] if len(sys.argv) > 1 else 'localhost')
 
 def fetch(url):
     with urllib.request.urlopen(url) as http:
@@ -50,8 +50,8 @@ def validatePulse(pulse, cert = None):
         utils.Prehashed(hashes.SHA512())
     )
 
-def validateSkiplist(src, dest):
-    skiplist = fetch_json('http://{}:8080/chain/0/skiplist/{}/{}'.format(ADDR, src, dest))
+def validateSkiplist(chain, src, dest):
+    skiplist = fetch_json('http://{}:8080/skiplist/chain/{}/{}/{}'.format(ADDR, chain, src, dest))
     prev = None
 
     for dict in skiplist:
@@ -88,9 +88,10 @@ if __name__ == '__main__':
 
 
     srcid = 2
-    print('\n\n*** Validating skiplist from last pulse ({}) to pulse {} ***'.format(pulse['pulseIndex'].get(), srcid))
+    chainid = pulse["chainIndex"].get()
+    print('\n\n*** Validating skiplist in chain {} from last pulse ({}) to pulse {} ***'.format(chainid, pulse['pulseIndex'].get(), srcid))
     try:
-        validateSkiplist(srcid, pulse['pulseIndex'].get())
+        validateSkiplist(chainid, srcid, pulse['pulseIndex'].get())
         print('>>> Valid skiplist <<<')
     except Exception as e:
         print(e)
